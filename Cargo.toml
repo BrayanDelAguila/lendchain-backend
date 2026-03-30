@@ -45,6 +45,11 @@ validator = { version = "0.18", features = ["derive"] }
 # BigDecimal (needed for NUMERIC columns via sqlx)
 bigdecimal = { version = "0.3", features = ["serde"] }
 
+# Encryption
+aes-gcm = "0.10"
+rand = "0.8"
+base64 = "0.21"
+
 # Async traits
 async-trait = "0.1"
 
