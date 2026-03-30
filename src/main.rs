@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
     // ─── Load and validate config ─────────────────────────────────────────────
-    let config = Config::from_env();
+    let config = Config::from_env().unwrap_or_else(|e| panic!("Config error: {}", e));
 
     // ─── Initialise tracing (JSON format) ────────────────────────────────────
     tracing_subscriber::registry()
