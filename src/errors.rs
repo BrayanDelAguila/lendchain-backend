@@ -92,3 +92,77 @@ impl ResponseError for AppError {
         }))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix_web::{body::MessageBody, ResponseError};
+
+    fn body_to_json(err: AppError) -> serde_json::Value {
+        let resp = err.error_response();
+        let (_, body) = resp.into_parts();
+        let bytes = body
+            .try_into_bytes()
+            .expect("error response body should be complete bytes");
+        serde_json::from_slice(&bytes).expect("error response body should be valid JSON")
+    }
+
+    #[test]
+    fn test_not_found_status() {
+        assert_eq!(AppError::NotFound.status_code(), actix_web::http::StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_unauthorized_status() {
+        assert_eq!(AppError::Unauthorized.status_code(), actix_web::http::StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn test_validation_status() {
+        assert_eq!(
+            AppError::Validation("bad input".to_string()).status_code(),
+            actix_web::http::StatusCode::UNPROCESSABLE_ENTITY
+        );
+    }
+
+    #[test]
+    fn test_blockchain_tx_failed_status() {
+        assert_eq!(
+            AppError::BlockchainTxFailed("revert".to_string()).status_code(),
+            actix_web::http::StatusCode::BAD_GATEWAY
+        );
+    }
+
+    #[test]
+    fn test_blockchain_timeout_status() {
+        assert_eq!(AppError::BlockchainTimeout.status_code(), actix_web::http::StatusCode::GATEWAY_TIMEOUT);
+    }
+
+    #[test]
+    fn test_error_response_json_shape() {
+        let json = body_to_json(AppError::NotFound);
+        assert_eq!(json["success"], false, "Response must have success: false");
+        assert!(json["error"]["code"].is_string(), "Response must have error.code as a string");
+        assert!(json["error"]["message"].is_string(), "Response must have error.message as a string");
+    }
+
+    #[test]
+    fn test_internal_error_hides_details() {
+        let secret = "hunter2_db_password";
+        let json = body_to_json(AppError::Internal(anyhow::anyhow!(
+            "DB connection failed: password={}",
+            secret
+        )));
+        let message = json["error"]["message"].as_str().unwrap_or_default();
+        assert!(
+            !message.contains(secret),
+            "Internal error detail must not be exposed in the response, got: {}",
+            message
+        );
+        assert!(
+            message.to_lowercase().contains("internal"),
+            "Generic internal error message expected, got: {}",
+            message
+        );
+    }
+}

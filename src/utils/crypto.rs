@@ -71,3 +71,58 @@ pub fn verify_password(password: &str, hash: &str) -> anyhow::Result<bool> {
     // TODO: use bcrypt::verify(password, hash)
     Ok(hash == format!("bcrypt_stub::{}", password))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+    #[test]
+    fn test_encrypt_decrypt_roundtrip() {
+        let plaintext = "my_super_secret_private_key_0xdeadbeef";
+        let encrypted = encrypt_private_key(plaintext, TEST_KEY).expect("encrypt should succeed");
+        let decrypted = decrypt_private_key(&encrypted, TEST_KEY).expect("decrypt should succeed");
+        assert_eq!(plaintext, decrypted);
+    }
+
+    #[test]
+    fn test_encrypt_produces_different_ciphertexts() {
+        let plaintext = "same_private_key";
+        let enc1 = encrypt_private_key(plaintext, TEST_KEY).expect("first encrypt should succeed");
+        let enc2 = encrypt_private_key(plaintext, TEST_KEY).expect("second encrypt should succeed");
+        assert_ne!(enc1, enc2, "Each encryption should produce a unique IV and therefore a unique ciphertext");
+    }
+
+    #[test]
+    fn test_decrypt_wrong_key_fails() {
+        let plaintext = "secret_key_data";
+        let wrong_key = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        let encrypted = encrypt_private_key(plaintext, TEST_KEY).expect("encrypt should succeed");
+        let result = decrypt_private_key(&encrypted, wrong_key);
+        assert!(result.is_err(), "Decryption with wrong key should fail");
+    }
+
+    #[test]
+    fn test_decrypt_invalid_format_fails() {
+        let result = decrypt_private_key("no_colon_separator_here", TEST_KEY);
+        assert!(result.is_err(), "Decryption of malformed input should fail");
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("':'"), "Error message should mention the missing separator");
+    }
+
+    #[test]
+    fn test_encrypt_short_key_fails() {
+        let short_key = "0123456789abcdef"; // Only 16 hex chars, needs 64
+        let result = encrypt_private_key("any_data", short_key);
+        assert!(result.is_err(), "Encryption with key shorter than 64 hex chars should fail");
+    }
+
+    #[test]
+    fn test_encrypt_empty_string() {
+        let plaintext = "";
+        let encrypted = encrypt_private_key(plaintext, TEST_KEY).expect("encrypt of empty string should succeed");
+        let decrypted = decrypt_private_key(&encrypted, TEST_KEY).expect("decrypt of empty string should succeed");
+        assert_eq!(plaintext, decrypted);
+    }
+}

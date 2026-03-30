@@ -1,12 +1,3 @@
-mod api;
-mod blockchain;
-mod config;
-mod db;
-mod errors;
-mod models;
-mod services;
-mod utils;
-
 use std::sync::Arc;
 
 use actix_cors::Cors;
@@ -15,9 +6,9 @@ use sqlx::postgres::PgPoolOptions;
 use tracing::info;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-use crate::blockchain::polygon::PolygonAdapter;
-use crate::blockchain::BlockchainAdapter;
-use crate::config::Config;
+use lendchain_backend::api;
+use lendchain_backend::blockchain::{polygon::PolygonAdapter, BlockchainAdapter};
+use lendchain_backend::config::Config;
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
