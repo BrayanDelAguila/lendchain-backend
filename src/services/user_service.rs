@@ -33,25 +33,6 @@ pub struct AuthResponse {
     pub refresh_token: String,
 }
 
-// ─── Validation helpers ───────────────────────────────────────────────────────
-
-fn validate_register(dto: &RegisterDto) -> Result<(), AppError> {
-    if !dto.email.contains('@') || !dto.email.contains('.') {
-        return Err(AppError::Validation("Invalid email format".into()));
-    }
-    if dto.password.len() < 8 {
-        return Err(AppError::Validation(
-            "Password must be at least 8 characters".into(),
-        ));
-    }
-    if dto.full_name.trim().len() < 2 {
-        return Err(AppError::Validation(
-            "Full name must be at least 2 characters".into(),
-        ));
-    }
-    Ok(())
-}
-
 // ─── SHA-256 hash for refresh tokens (stored in DB, never the raw token) ──────
 
 fn sha256_hex(input: &str) -> String {
@@ -70,8 +51,6 @@ pub async fn register(
     jwt_secret: &str,
     wallet_encryption_key: &str,
 ) -> Result<AuthResponse, AppError> {
-    validate_register(&dto)?;
-
     // Check for duplicate email
     if db::find_by_email(pool, &dto.email).await?.is_some() {
         return Err(AppError::Validation("Email already in use".into()));
@@ -150,7 +129,7 @@ async fn issue_tokens(
 
     let refresh_token = generate_refresh_token();
     let token_hash = sha256_hex(&refresh_token);
-    let expires_at = Utc::now() + chrono::Duration::days(30);
+    let expires_at = Utc::now() + chrono::Duration::days(7);
 
     db::insert_refresh_token(pool, *user_id, &token_hash, expires_at).await?;
 

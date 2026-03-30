@@ -22,7 +22,7 @@ pub async fn insert_user(
             (id, email, password_hash, full_name, document_number, phone,
              wallet_address, encrypted_private_key, kyc_status, role,
              is_active, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', 'borrower', true, NOW(), NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', 'USER', true, NOW(), NOW())
         RETURNING *
         "#,
     )

@@ -1,6 +1,7 @@
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
 use sqlx::PgPool;
+use validator::Validate;
 use uuid::Uuid;
 
 use crate::config::Config;
@@ -11,10 +12,13 @@ use crate::services::user_service::{self, LoginDto, RegisterDto};
 
 // ─── Request bodies ───────────────────────────────────────────────────────────
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct RegisterBody {
+    #[validate(email(message = "Invalid email format"))]
     pub email: String,
+    #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
     pub password: String,
+    #[validate(length(min = 2, message = "Full name must be at least 2 characters"))]
     pub full_name: String,
     pub document_number: Option<String>,
     pub phone: Option<String>,
@@ -34,6 +38,8 @@ pub async fn register(
     config: web::Data<Config>,
     body: web::Json<RegisterBody>,
 ) -> Result<HttpResponse, AppError> {
+    body.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+
     let dto = RegisterDto {
         email: body.email.clone(),
         password: body.password.clone(),
