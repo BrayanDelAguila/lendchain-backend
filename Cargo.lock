@@ -2391,6 +2391,7 @@ name = "lendchain-backend"
 version = "0.1.0"
 dependencies = [
  "actix-cors",
+ "actix-http",
  "actix-web",
  "aes-gcm",
  "anyhow",

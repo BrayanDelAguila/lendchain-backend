@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::types::BigDecimal;
 use uuid::Uuid;
+use validator::Validate;
 
 /// Loan record as stored in the database.
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -47,5 +48,38 @@ impl LoanStatus {
             LoanStatus::Defaulted => "DEFAULTED",
             LoanStatus::Cancelled => "CANCELLED",
         }
+    }
+}
+
+/// Request body for creating a new loan.
+#[derive(Debug, Deserialize, Validate)]
+pub struct CreateLoanBody {
+    /// Loan amount in USDC — minimum $100.
+    #[validate(range(min = 100.0, message = "Minimum loan amount is $100 USDC"))]
+    pub amount_usdc: f64,
+
+    /// Loan term in months — must be one of: 3, 6, 12, 24, 36.
+    #[validate(custom(function = "validate_term_months"))]
+    pub term_months: i16,
+
+    /// Annual interest rate as a decimal (e.g. 0.05 for 5%).
+    #[validate(range(
+        min = 0.01,
+        max = 1.0,
+        message = "Annual rate must be between 1% and 100%"
+    ))]
+    pub annual_rate: f64,
+
+    /// Optional free-text purpose of the loan.
+    pub purpose: Option<String>,
+}
+
+fn validate_term_months(term: i16) -> Result<(), validator::ValidationError> {
+    if [3, 6, 12, 24, 36].contains(&term) {
+        Ok(())
+    } else {
+        Err(validator::ValidationError::new(
+            "term_months must be one of: 3, 6, 12, 24, 36",
+        ))
     }
 }
