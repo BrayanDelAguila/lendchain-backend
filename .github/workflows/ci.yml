@@ -1,0 +1,203 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ── Job 1: Lint y formato ─────────────────────────────────────────────────
+  lint:
+    name: Lint & format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy -- -D warnings
+
+  # ── Job 2: Build y tests unitarios ───────────────────────────────────────
+  test:
+    name: Build & unit tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Run unit tests
+        run: cargo test --lib -- --nocapture
+
+  # ── Job 3: Tests de integración con PostgreSQL real ───────────────────────
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    needs: test
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lendchain
+          POSTGRES_PASSWORD: lendchain
+          POSTGRES_DB: lendchain_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lendchain"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://lendchain:lendchain@localhost:5432/lendchain_test
+      DATABASE_URL: postgres://lendchain:lendchain@localhost:5432/lendchain_test
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci_test_jwt_secret_minimum_32_chars_ok
+      WALLET_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      POLYGON_RPC_URL: https://rpc-mumbai.maticvigil.com
+      POLYGON_CHAIN_ID: 80001
+      POLYGON_CONTRACT_ADDRESS: "0x0000000000000000000000000000000000000000"
+      USDC_CONTRACT_ADDRESS_POLYGON: "0x0000000000000000000000000000000000000000"
+      BACKEND_PORT: "8080"
+      CORS_ORIGINS: "http://localhost:3000"
+      ENVIRONMENT: test
+      LOG_LEVEL: info
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Run integration tests
+        run: cargo test --test integration -- --nocapture
+
+  # ── Job 4: Docker smoke test ──────────────────────────────────────────────
+  docker:
+    name: Docker smoke test
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create .env for Docker
+        run: |
+          cat > .env << 'EOF'
+          DATABASE_URL=postgres://lendchain:lendchain@postgres:5432/lendchain
+          REDIS_URL=redis://redis:6379
+          JWT_SECRET=ci_test_jwt_secret_minimum_32_chars_ok
+          WALLET_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          POLYGON_RPC_URL=https://rpc-mumbai.maticvigil.com
+          POLYGON_CHAIN_ID=80001
+          POLYGON_CONTRACT_ADDRESS=0x0000000000000000000000000000000000000000
+          USDC_CONTRACT_ADDRESS_POLYGON=0x0000000000000000000000000000000000000000
+          BACKEND_PORT=8080
+          CORS_ORIGINS=http://localhost:3000
+          ENVIRONMENT=development
+          LOG_LEVEL=info
+          EOF
+
+      - name: Build and start containers
+        run: docker compose up -d --build
+
+      - name: Wait for backend to be healthy
+        run: |
+          echo "Waiting for backend..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/health; then
+              echo "Backend is up!"
+              exit 0
+            fi
+            echo "Attempt $i/30 — retrying in 5s..."
+            sleep 5
+          done
+          echo "Backend failed to start"
+          docker compose logs backend
+          exit 1
+
+      - name: Smoke test — health endpoint
+        run: |
+          RESPONSE=$(curl -sf http://localhost:8080/health)
+          echo "Response: $RESPONSE"
+          echo $RESPONSE | grep -q '"status":"ok"'
+
+      - name: Smoke test — register endpoint responde (no 5xx)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST http://localhost:8080/api/v1/users/register \
+            -H "Content-Type: application/json" \
+            -d '{"email":"ci@test.com","password":"CiTest123!","full_name":"CI Test"}')
+          echo "Register status: $STATUS"
+          [ "$STATUS" != "500" ] && [ "$STATUS" != "502" ] && [ "$STATUS" != "503" ]
+
+      - name: Smoke test — login endpoint responde (no 5xx)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST http://localhost:8080/api/v1/users/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"noexiste@test.com","password":"cualquier"}')
+          echo "Login status: $STATUS"
+          [ "$STATUS" != "500" ] && [ "$STATUS" != "502" ] && [ "$STATUS" != "503" ]
+
+      - name: Print logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

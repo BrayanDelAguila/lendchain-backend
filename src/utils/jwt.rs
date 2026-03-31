@@ -1,5 +1,4 @@
 /// JWT utilities — access token generation and verification.
-
 use chrono::Utc;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};

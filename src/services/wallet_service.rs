@@ -11,7 +11,10 @@ pub struct WalletService {
 
 impl WalletService {
     pub fn new(pool: PgPool, encryption_key: String) -> Self {
-        Self { pool, encryption_key }
+        Self {
+            pool,
+            encryption_key,
+        }
     }
 
     // TODO: create_wallet, derive_address, sign_transaction

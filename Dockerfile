@@ -1,5 +1,5 @@
 # ─── Stage 1: Builder ─────────────────────────────────────────────────────────
-FROM rust:1.77-slim AS builder
+FROM rust:1.88-slim AS builder
 
 # Install system dependencies required for compilation
 RUN apt-get update && apt-get install -y \
@@ -9,19 +9,12 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy manifest files first (Docker layer cache optimisation)
-COPY Cargo.toml Cargo.lock* ./
-
-# Create a dummy src/main.rs to pre-compile dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
-RUN cargo build --release 2>/dev/null || true
-
-# Now copy the real source code
+# Copy all source files and build
+COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY migrations ./migrations
 
-# Touch main.rs so cargo detects the change and rebuilds
-RUN touch src/main.rs && cargo build --release
+RUN cargo build --release
 
 # ─── Stage 2: Runtime ─────────────────────────────────────────────────────────
 FROM debian:bookworm-slim AS runtime

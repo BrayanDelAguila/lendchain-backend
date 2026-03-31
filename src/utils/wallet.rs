@@ -1,5 +1,4 @@
 /// Custodial wallet generation using ethers-rs.
-
 use ethers::signers::{LocalWallet, Signer};
 
 use crate::utils::crypto::encrypt_private_key;

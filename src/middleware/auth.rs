@@ -1,10 +1,5 @@
 /// Actix-web extractor that validates a Bearer JWT and injects the claims.
-
-use actix_web::{
-    dev::Payload,
-    web,
-    FromRequest, HttpRequest,
-};
+use actix_web::{dev::Payload, web, FromRequest, HttpRequest};
 use std::future::{ready, Ready};
 
 use crate::config::Config;

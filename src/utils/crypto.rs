@@ -1,5 +1,4 @@
 /// Cryptographic utilities for wallet key encryption and hashing.
-
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
@@ -79,8 +78,7 @@ pub fn verify_password(password: &str, hash: &str) -> anyhow::Result<bool> {
         password_hash::{PasswordHash, PasswordVerifier},
         Argon2,
     };
-    let parsed =
-        PasswordHash::new(hash).map_err(|e| anyhow::anyhow!("Invalid hash: {}", e))?;
+    let parsed = PasswordHash::new(hash).map_err(|e| anyhow::anyhow!("Invalid hash: {}", e))?;
     Ok(Argon2::default()
         .verify_password(password.as_bytes(), &parsed)
         .is_ok())
@@ -105,7 +103,10 @@ mod tests {
         let plaintext = "same_private_key";
         let enc1 = encrypt_private_key(plaintext, TEST_KEY).expect("first encrypt should succeed");
         let enc2 = encrypt_private_key(plaintext, TEST_KEY).expect("second encrypt should succeed");
-        assert_ne!(enc1, enc2, "Each encryption should produce a unique IV and therefore a unique ciphertext");
+        assert_ne!(
+            enc1, enc2,
+            "Each encryption should produce a unique IV and therefore a unique ciphertext"
+        );
     }
 
     #[test]
@@ -122,21 +123,29 @@ mod tests {
         let result = decrypt_private_key("no_colon_separator_here", TEST_KEY);
         assert!(result.is_err(), "Decryption of malformed input should fail");
         let msg = result.unwrap_err().to_string();
-        assert!(msg.contains("':'"), "Error message should mention the missing separator");
+        assert!(
+            msg.contains("':'"),
+            "Error message should mention the missing separator"
+        );
     }
 
     #[test]
     fn test_encrypt_short_key_fails() {
         let short_key = "0123456789abcdef"; // Only 16 hex chars, needs 64
         let result = encrypt_private_key("any_data", short_key);
-        assert!(result.is_err(), "Encryption with key shorter than 64 hex chars should fail");
+        assert!(
+            result.is_err(),
+            "Encryption with key shorter than 64 hex chars should fail"
+        );
     }
 
     #[test]
     fn test_encrypt_empty_string() {
         let plaintext = "";
-        let encrypted = encrypt_private_key(plaintext, TEST_KEY).expect("encrypt of empty string should succeed");
-        let decrypted = decrypt_private_key(&encrypted, TEST_KEY).expect("decrypt of empty string should succeed");
+        let encrypted = encrypt_private_key(plaintext, TEST_KEY)
+            .expect("encrypt of empty string should succeed");
+        let decrypted = decrypt_private_key(&encrypted, TEST_KEY)
+            .expect("decrypt of empty string should succeed");
         assert_eq!(plaintext, decrypted);
     }
 }
