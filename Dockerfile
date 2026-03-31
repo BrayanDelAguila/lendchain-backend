@@ -10,10 +10,10 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy manifest files first (Docker layer cache optimisation)
-COPY Cargo.toml Cargo.lock* ./
+COPY Cargo.toml Cargo.lock ./
 
-# Create a dummy src/main.rs to pre-compile dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+# Create a dummy src/main.rs and lib.rs to pre-compile dependencies
+RUN mkdir src && echo "fn main() {}" > src/main.rs && echo "" > src/lib.rs
 RUN cargo build --release 2>/dev/null || true
 
 # Now copy the real source code

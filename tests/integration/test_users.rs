@@ -29,7 +29,7 @@ async fn test_register_success() {
         }))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     // Will be 201 once handler is implemented; currently returns stub 201
     assert_eq!(
         resp.status(),
@@ -64,7 +64,7 @@ async fn test_register_duplicate_email_fails() {
         .uri("/api/v1/users/register")
         .set_json(&body)
         .to_request();
-    let resp = test::call_service(&app, req2).await;
+    let resp: common::TestResponse = test::call_service(&app, req2).await;
 
     // TODO: once handler is implemented this should be 409 or 422
     assert!(
@@ -89,7 +89,7 @@ async fn test_register_empty_body_fails() {
         .set_payload("{}")
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     // TODO: once handler validates body this should be 422
     assert!(
         !resp.status().is_server_error(),
@@ -116,7 +116,7 @@ async fn test_register_invalid_email_fails() {
         }))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     // TODO: once validation is implemented this should be 422
     assert!(
         !resp.status().is_server_error(),
@@ -143,7 +143,7 @@ async fn test_register_short_password_fails() {
         }))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     // TODO: once validation is implemented this should be 422
     assert!(
         !resp.status().is_server_error(),
@@ -171,7 +171,7 @@ async fn test_login_success() {
         }))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     // TODO: once handler is implemented this should be 200 with tokens
     assert!(
         !resp.status().is_server_error(),
@@ -197,7 +197,7 @@ async fn test_login_wrong_password_fails() {
         }))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     // TODO: once handler is implemented this should be 401
     assert!(
         !resp.status().is_server_error(),
@@ -223,7 +223,7 @@ async fn test_login_nonexistent_user_fails() {
         }))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     // TODO: once handler is implemented this should be 401
     assert!(
         !resp.status().is_server_error(),
@@ -246,7 +246,7 @@ async fn test_me_without_token_fails() {
         .uri("/api/v1/users/me")
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     assert_eq!(
         resp.status(),
         actix_web::http::StatusCode::UNAUTHORIZED,
@@ -270,7 +270,7 @@ async fn test_me_with_valid_token_success() {
         .insert_header(("Authorization", "Bearer stub_token"))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     // Currently returns 401 (stub). Will be 200 once JWT middleware is implemented.
     assert!(
         !resp.status().is_server_error(),
