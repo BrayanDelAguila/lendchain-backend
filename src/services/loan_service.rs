@@ -75,13 +75,20 @@ pub async fn create_loan(
     );
     let payment_rows: Vec<db_payments::PaymentRow> = schedule
         .iter()
-        .map(|row| db_payments::PaymentRow {
-            payment_number: row.payment_number as i16,
-            amount_usdc: BigDecimal::from_f64(row.payment).unwrap_or_default(),
-            principal: BigDecimal::from_f64(row.principal).unwrap_or_default(),
-            interest: BigDecimal::from_f64(row.interest).unwrap_or_default(),
+        .map(|row| -> Result<db_payments::PaymentRow, AppError> {
+            Ok(db_payments::PaymentRow {
+                payment_number: row.payment_number as i16,
+                amount_usdc: BigDecimal::from_f64(row.payment)
+                    .ok_or_else(|| AppError::Internal(anyhow::anyhow!("Invalid payment amount")))?,
+                principal: BigDecimal::from_f64(row.principal).ok_or_else(|| {
+                    AppError::Internal(anyhow::anyhow!("Invalid principal amount"))
+                })?,
+                interest: BigDecimal::from_f64(row.interest).ok_or_else(|| {
+                    AppError::Internal(anyhow::anyhow!("Invalid interest amount"))
+                })?,
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, AppError>>()?;
 
     db_payments::insert_payment_schedule(pool, loan.id, &payment_rows).await?;
 
@@ -96,7 +103,8 @@ pub async fn create_loan(
         .await?;
 
     // Persist contract info
-    db_loans::update_contract_info(pool, loan.id, &receipt.tx_hash, &receipt.tx_hash).await?;
+    db_loans::update_contract_info(pool, loan.id, &receipt.contract_address, &receipt.tx_hash)
+        .await?;
 
     // Re-fetch updated loan
     let updated = db_loans::find_by_id(pool, loan.id)

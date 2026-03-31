@@ -75,7 +75,7 @@ pub struct CreateLoanBody {
 }
 
 fn validate_term_months(term: i16) -> Result<(), validator::ValidationError> {
-    if [3, 6, 12, 24, 36].contains(&term) {
+    if [3, 6, 12, 24].contains(&term) {
         Ok(())
     } else {
         Err(validator::ValidationError::new(
