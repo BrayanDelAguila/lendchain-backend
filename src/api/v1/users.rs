@@ -1,8 +1,8 @@
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
 use sqlx::PgPool;
-use validator::Validate;
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::config::Config;
 use crate::db::users as db;
@@ -38,7 +38,8 @@ pub async fn register(
     config: web::Data<Config>,
     body: web::Json<RegisterBody>,
 ) -> Result<HttpResponse, AppError> {
-    body.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+    body.validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
 
     let dto = RegisterDto {
         email: body.email.clone(),
@@ -94,11 +95,7 @@ pub async fn me(
     pool: web::Data<PgPool>,
     auth: AuthenticatedUser,
 ) -> Result<HttpResponse, AppError> {
-    let user_id: Uuid = auth
-        .0
-        .sub
-        .parse()
-        .map_err(|_| AppError::Unauthorized)?;
+    let user_id: Uuid = auth.0.sub.parse().map_err(|_| AppError::Unauthorized)?;
 
     let user = db::find_by_id(&pool, user_id)
         .await?

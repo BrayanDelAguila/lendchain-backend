@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::models::user::User;
 
 /// Insert a new user and return the created record.
+#[allow(clippy::too_many_arguments)]
 pub async fn insert_user(
     pool: &PgPool,
     id: Uuid,

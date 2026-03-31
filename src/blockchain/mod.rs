@@ -57,8 +57,5 @@ pub trait BlockchainAdapter: Send + Sync {
     ) -> Result<TxReceipt, AppError>;
 
     /// Fetch the current on-chain state of a loan contract.
-    async fn get_loan_state(
-        &self,
-        contract_address: &str,
-    ) -> Result<OnChainLoanState, AppError>;
+    async fn get_loan_state(&self, contract_address: &str) -> Result<OnChainLoanState, AppError>;
 }

@@ -1,5 +1,4 @@
 /// Business logic for user registration, login and profile management.
-
 use chrono::Utc;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
@@ -56,11 +55,9 @@ pub async fn register(
         return Err(AppError::Validation("Email already in use".into()));
     }
 
-    let password_hash =
-        hash_password(&dto.password).map_err(|e| AppError::Internal(e))?;
+    let password_hash = hash_password(&dto.password).map_err(AppError::Internal)?;
 
-    let wallet = generate_custodial_wallet(wallet_encryption_key)
-        .map_err(|e| AppError::Internal(e))?;
+    let wallet = generate_custodial_wallet(wallet_encryption_key).map_err(AppError::Internal)?;
 
     let user_id = Uuid::new_v4();
     let user = db::insert_user(

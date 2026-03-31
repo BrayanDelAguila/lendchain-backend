@@ -1,4 +1,4 @@
-/// Loan financial calculator utilities.
+//! Loan financial calculator utilities.
 
 /// Calculate the fixed monthly payment using the standard amortisation formula:
 ///   M = P * [r(1+r)^n] / [(1+r)^n - 1]
@@ -79,7 +79,11 @@ mod tests {
     #[test]
     fn test_schedule_length() {
         let schedule = amortisation_schedule(1000.0, 0.05, 24);
-        assert_eq!(schedule.len(), 24, "Schedule must have exactly term_months rows");
+        assert_eq!(
+            schedule.len(),
+            24,
+            "Schedule must have exactly term_months rows"
+        );
     }
 
     #[test]
@@ -90,7 +94,10 @@ mod tests {
         assert!(
             (reconstructed - row.payment).abs() < EPSILON,
             "principal + interest should equal payment; got {:.4} + {:.4} = {:.4}, payment = {:.4}",
-            row.principal, row.interest, reconstructed, row.payment
+            row.principal,
+            row.interest,
+            reconstructed,
+            row.payment
         );
     }
 
