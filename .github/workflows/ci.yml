@@ -81,7 +81,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U lendchain"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -153,7 +153,7 @@ jobs:
           EOF
 
       - name: Build and start containers
-        run: docker-compose up -d --build
+        run: docker compose up -d --build
 
       - name: Wait for backend to be healthy
         run: |
@@ -167,7 +167,7 @@ jobs:
             sleep 5
           done
           echo "Backend failed to start"
-          docker-compose logs backend
+          docker compose logs backend
           exit 1
 
       - name: Smoke test — health endpoint
@@ -196,8 +196,8 @@ jobs:
 
       - name: Print logs on failure
         if: failure()
-        run: docker-compose logs
+        run: docker compose logs
 
       - name: Tear down
         if: always()
-        run: docker-compose down -v
+        run: docker compose down -v
