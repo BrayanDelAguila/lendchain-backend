@@ -67,6 +67,7 @@ async-trait = "0.1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
+actix-http = "3"
 
 [[test]]
 name = "integration"

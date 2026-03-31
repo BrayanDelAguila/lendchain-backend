@@ -20,7 +20,7 @@ async fn test_list_loans_unauthorized() {
     let app = common::spawn_app(pool).await;
 
     let req = test::TestRequest::get().uri("/api/v1/loans").to_request();
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     // TODO: once auth middleware is added this should be 401
     assert!(
         !resp.status().is_server_error(),
@@ -41,7 +41,7 @@ async fn test_create_loan_unauthorized() {
         .uri("/api/v1/loans")
         .set_json(serde_json::json!({}))
         .to_request();
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     // TODO: once auth middleware is added this should be 401
     assert!(
         !resp.status().is_server_error(),
@@ -72,7 +72,7 @@ async fn test_create_loan_success() {
         }))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     assert_eq!(
         resp.status(),
         actix_web::http::StatusCode::CREATED,
@@ -100,7 +100,7 @@ async fn test_create_loan_amount_too_low_fails() {
         }))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     // TODO: once validation is implemented this should be 422
     assert!(
         !resp.status().is_server_error(),
@@ -128,7 +128,7 @@ async fn test_create_loan_invalid_term_fails() {
         }))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     // TODO: once validation is implemented this should be 422
     assert!(
         !resp.status().is_server_error(),
@@ -153,7 +153,7 @@ async fn test_list_loans_only_own() {
         .insert_header(("Authorization", "Bearer stub_token"))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     assert!(
         resp.status().is_success(),
         "GET /loans with token should return 2xx, got {}",
@@ -180,7 +180,7 @@ async fn test_get_loan_success() {
         .insert_header(("Authorization", "Bearer stub_token"))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     // Currently returns 404 (stub). Will be 200 once handler is implemented.
     assert!(
         !resp.status().is_server_error(),
@@ -205,7 +205,7 @@ async fn test_get_loan_forbidden_other_user() {
         .insert_header(("Authorization", "Bearer other_user_stub_token"))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     // TODO: once ownership check is implemented this should be 403
     assert!(
         !resp.status().is_server_error(),
@@ -228,7 +228,7 @@ async fn test_get_loan_not_found() {
         .insert_header(("Authorization", "Bearer stub_token"))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     assert_eq!(
         resp.status(),
         actix_web::http::StatusCode::NOT_FOUND,
@@ -252,7 +252,7 @@ async fn test_list_available_loans_public() {
         .uri("/api/v1/loans/available")
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     assert!(
         resp.status().is_success(),
         "GET /loans/available should be publicly accessible, got {}",
@@ -277,7 +277,7 @@ async fn test_get_loan_schedule_correct_rows() {
         .insert_header(("Authorization", "Bearer stub_token"))
         .to_request();
 
-    let resp = test::call_service(&app, req).await;
+    let resp: common::TestResponse = test::call_service(&app, req).await;
     assert!(
         resp.status().is_success(),
         "GET /loans/:id/schedule should return 2xx, got {}",
