@@ -60,16 +60,30 @@ fn hex_to_32_bytes(hex_key: &str) -> anyhow::Result<[u8; 32]> {
     Ok(bytes)
 }
 
-/// Hash a password using bcrypt (stub — replace with `bcrypt` crate).
+/// Hash a password using Argon2id.
 pub fn hash_password(password: &str) -> anyhow::Result<String> {
-    // TODO: use bcrypt::hash(password, bcrypt::DEFAULT_COST)
-    Ok(format!("bcrypt_stub::{}", password))
+    use argon2::{
+        password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
+        Argon2,
+    };
+    let salt = SaltString::generate(&mut OsRng);
+    let hash = Argon2::default()
+        .hash_password(password.as_bytes(), &salt)
+        .map_err(|e| anyhow::anyhow!("Hash failed: {}", e))?;
+    Ok(hash.to_string())
 }
 
-/// Verify a password against its bcrypt hash (stub).
+/// Verify a password against its Argon2 hash.
 pub fn verify_password(password: &str, hash: &str) -> anyhow::Result<bool> {
-    // TODO: use bcrypt::verify(password, hash)
-    Ok(hash == format!("bcrypt_stub::{}", password))
+    use argon2::{
+        password_hash::{PasswordHash, PasswordVerifier},
+        Argon2,
+    };
+    let parsed =
+        PasswordHash::new(hash).map_err(|e| anyhow::anyhow!("Invalid hash: {}", e))?;
+    Ok(Argon2::default()
+        .verify_password(password.as_bytes(), &parsed)
+        .is_ok())
 }
 
 #[cfg(test)]
