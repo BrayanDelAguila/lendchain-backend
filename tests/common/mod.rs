@@ -53,8 +53,7 @@ pub async fn spawn_app(
             .route(
                 "/health",
                 web::get().to(|| async {
-                    actix_web::HttpResponse::Ok()
-                        .json(serde_json::json!({"status": "ok"}))
+                    actix_web::HttpResponse::Ok().json(serde_json::json!({"status": "ok"}))
                 }),
             )
             .configure(lendchain_backend::api::v1::configure),

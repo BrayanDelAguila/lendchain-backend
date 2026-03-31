@@ -71,10 +71,7 @@ impl BlockchainAdapter for PolygonAdapter {
         Ok(Self::stub_receipt())
     }
 
-    async fn get_loan_state(
-        &self,
-        contract_address: &str,
-    ) -> Result<OnChainLoanState, AppError> {
+    async fn get_loan_state(&self, contract_address: &str) -> Result<OnChainLoanState, AppError> {
         // TODO: query contract state from the chain
         tracing::info!(contract = %contract_address, "get_loan_state stub called");
         Ok(OnChainLoanState {
@@ -106,13 +103,18 @@ mod tests {
             .await;
         assert!(result.is_ok(), "deploy_loan_contract stub should return Ok");
         let receipt = result.unwrap();
-        assert!(!receipt.tx_hash.is_empty(), "Stub receipt tx_hash should not be empty");
+        assert!(
+            !receipt.tx_hash.is_empty(),
+            "Stub receipt tx_hash should not be empty"
+        );
     }
 
     #[tokio::test]
     async fn test_fund_loan_stub_ok() {
         let adapter = make_adapter();
-        let result = adapter.fund_loan("0xContractAddress", "0xLenderAddress", 1000.0).await;
+        let result = adapter
+            .fund_loan("0xContractAddress", "0xLenderAddress", 1000.0)
+            .await;
         assert!(result.is_ok(), "fund_loan stub should return Ok");
     }
 
@@ -130,8 +132,14 @@ mod tests {
         let result = adapter.get_loan_state(contract).await;
         assert!(result.is_ok(), "get_loan_state stub should return Ok");
         let state = result.unwrap();
-        assert!(!state.is_funded, "Stub loan state should have is_funded = false");
-        assert!(!state.is_repaid, "Stub loan state should have is_repaid = false");
+        assert!(
+            !state.is_funded,
+            "Stub loan state should have is_funded = false"
+        );
+        assert!(
+            !state.is_repaid,
+            "Stub loan state should have is_repaid = false"
+        );
         assert_eq!(state.contract_address, contract);
     }
 }

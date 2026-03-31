@@ -19,9 +19,7 @@ async fn test_list_loans_unauthorized() {
     };
     let app = common::spawn_app(pool).await;
 
-    let req = test::TestRequest::get()
-        .uri("/api/v1/loans")
-        .to_request();
+    let req = test::TestRequest::get().uri("/api/v1/loans").to_request();
     let resp = test::call_service(&app, req).await;
     // TODO: once auth middleware is added this should be 401
     assert!(

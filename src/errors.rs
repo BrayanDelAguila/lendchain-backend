@@ -109,12 +109,18 @@ mod tests {
 
     #[test]
     fn test_not_found_status() {
-        assert_eq!(AppError::NotFound.status_code(), actix_web::http::StatusCode::NOT_FOUND);
+        assert_eq!(
+            AppError::NotFound.status_code(),
+            actix_web::http::StatusCode::NOT_FOUND
+        );
     }
 
     #[test]
     fn test_unauthorized_status() {
-        assert_eq!(AppError::Unauthorized.status_code(), actix_web::http::StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            AppError::Unauthorized.status_code(),
+            actix_web::http::StatusCode::UNAUTHORIZED
+        );
     }
 
     #[test]
@@ -135,15 +141,24 @@ mod tests {
 
     #[test]
     fn test_blockchain_timeout_status() {
-        assert_eq!(AppError::BlockchainTimeout.status_code(), actix_web::http::StatusCode::GATEWAY_TIMEOUT);
+        assert_eq!(
+            AppError::BlockchainTimeout.status_code(),
+            actix_web::http::StatusCode::GATEWAY_TIMEOUT
+        );
     }
 
     #[test]
     fn test_error_response_json_shape() {
         let json = body_to_json(AppError::NotFound);
         assert_eq!(json["success"], false, "Response must have success: false");
-        assert!(json["error"]["code"].is_string(), "Response must have error.code as a string");
-        assert!(json["error"]["message"].is_string(), "Response must have error.message as a string");
+        assert!(
+            json["error"]["code"].is_string(),
+            "Response must have error.code as a string"
+        );
+        assert!(
+            json["error"]["message"].is_string(),
+            "Response must have error.message as a string"
+        );
     }
 
     #[test]
