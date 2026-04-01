@@ -58,7 +58,7 @@ pub struct CreateLoanBody {
     #[validate(range(min = 100.0, message = "Minimum loan amount is $100 USDC"))]
     pub amount_usdc: f64,
 
-    /// Loan term in months — must be one of: 3, 6, 12, 24, 36.
+    /// Loan term in months — must be one of: 3, 6, 12, 24.
     #[validate(custom(function = "validate_term_months"))]
     pub term_months: i16,
 
@@ -79,7 +79,7 @@ fn validate_term_months(term: i16) -> Result<(), validator::ValidationError> {
         Ok(())
     } else {
         Err(validator::ValidationError::new(
-            "term_months must be one of: 3, 6, 12, 24, 36",
+            "term_months must be one of: 3, 6, 12, 24",
         ))
     }
 }
