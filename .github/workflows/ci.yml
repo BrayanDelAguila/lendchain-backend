@@ -125,7 +125,7 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Run integration tests
-        run: cargo test --test integration -- --nocapture
+        run: cargo test --test integration -- --test-threads=1 --nocapture
 
   # ── Job 4: Docker smoke test ──────────────────────────────────────────────
   docker:

@@ -82,3 +82,28 @@ pub async fn spawn_app(
     )
     .await
 }
+
+/// Register a fresh user and return a valid JWT access token.
+/// The email is randomised so parallel tests don't collide.
+pub async fn create_test_user_token(pool: PgPool) -> String {
+    let app = spawn_app(pool).await;
+    let email = format!("testuser_{}@example.com", uuid::Uuid::new_v4());
+
+    let req = actix_web::test::TestRequest::post()
+        .uri("/api/v1/users/register")
+        .set_json(serde_json::json!({
+            "email": email,
+            "password": "TestPass123!",
+            "full_name": "Test User"
+        }))
+        .to_request();
+
+    let resp: TestResponse = actix_web::test::call_service(&app, req).await;
+    let body = actix_web::test::read_body(resp).await;
+    let json: serde_json::Value =
+        serde_json::from_slice(&body).expect("register response should be valid JSON");
+    json["data"]["access_token"]
+        .as_str()
+        .expect("access_token missing from register response")
+        .to_string()
+}

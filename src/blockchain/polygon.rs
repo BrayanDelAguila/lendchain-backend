@@ -25,6 +25,7 @@ impl PolygonAdapter {
     fn stub_receipt() -> TxReceipt {
         TxReceipt {
             tx_hash: "0x_stub_polygon_tx_hash".to_string(),
+            contract_address: "0x_stub_contract_address".to_string(),
             block_number: Some(0),
             gas_used: Some(0),
         }

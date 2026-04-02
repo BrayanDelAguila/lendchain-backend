@@ -12,6 +12,7 @@ use crate::errors::AppError;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxReceipt {
     pub tx_hash: String,
+    pub contract_address: String,
     pub block_number: Option<u64>,
     pub gas_used: Option<u64>,
 }
