@@ -15,6 +15,9 @@ pub struct Config {
     pub cors_origins: Vec<String>,
     pub environment: String,
     pub log_level: String,
+    /// Private key (hex, no 0x prefix) of the backend deployer wallet.
+    /// Used to pay gas fees for contract deployments on Polygon.
+    pub deployer_private_key: String,
 }
 
 impl Config {
@@ -41,6 +44,7 @@ impl Config {
                 .collect(),
             environment: require_env("ENVIRONMENT")?,
             log_level: require_env("LOG_LEVEL")?,
+            deployer_private_key: require_env("DEPLOYER_PRIVATE_KEY")?,
         })
     }
 
@@ -89,6 +93,10 @@ mod tests {
         std::env::set_var("CORS_ORIGINS", "http://localhost:3000");
         std::env::set_var("ENVIRONMENT", "development");
         std::env::set_var("LOG_LEVEL", "info");
+        std::env::set_var(
+            "DEPLOYER_PRIVATE_KEY",
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        );
     }
 
     fn clear_all_env_vars() {
@@ -105,6 +113,7 @@ mod tests {
             "CORS_ORIGINS",
             "ENVIRONMENT",
             "LOG_LEVEL",
+            "DEPLOYER_PRIVATE_KEY",
         ] {
             std::env::remove_var(key);
         }
@@ -180,6 +189,7 @@ mod tests {
             cors_origins: vec![],
             environment: "production".to_string(),
             log_level: "info".to_string(),
+            deployer_private_key: "x".to_string(),
         };
         assert!(
             cfg.is_production(),

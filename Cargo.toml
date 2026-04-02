@@ -60,7 +60,10 @@ sha2 = "0.10"
 jsonwebtoken = "9"
 
 # Blockchain / Wallets
-ethers = "2"
+ethers = { version = "2", features = ["abigen", "legacy"] }
+
+# Hex encoding/decoding (for bytecode)
+hex = "0.4"
 
 # Async traits
 async-trait = "0.1"

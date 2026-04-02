@@ -2402,6 +2402,7 @@ dependencies = [
  "chrono",
  "dotenvy",
  "ethers",
+ "hex",
  "jsonwebtoken 9.3.1",
  "rand 0.8.5",
  "serde",
