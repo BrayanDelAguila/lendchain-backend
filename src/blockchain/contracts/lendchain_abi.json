@@ -6,8 +6,7 @@
       { "name": "_borrower",      "type": "address" },
       { "name": "_amountUsdc",    "type": "uint256" },
       { "name": "_termMonths",    "type": "uint256" },
-      { "name": "_annualRateBps", "type": "uint256" },
-      { "name": "_lender",        "type": "address" }
+      { "name": "_annualRateBps", "type": "uint256" }
     ],
     "stateMutability": "nonpayable"
   },

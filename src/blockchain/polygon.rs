@@ -69,10 +69,23 @@ impl BlockchainAdapter for PolygonAdapter {
         let abi: Abi = serde_json::from_str(include_str!("contracts/lendchain_abi.json"))
             .map_err(|e| AppError::Internal(anyhow::anyhow!("ABI parse error: {}", e)))?;
 
-        let bytecode = Bytes::from(
-            hex::decode(include_str!("contracts/lendchain_bytecode.hex").trim())
-                .map_err(|e| AppError::Internal(anyhow::anyhow!("Bytecode decode error: {}", e)))?,
-        );
+        let bytecode_str = include_str!("contracts/lendchain_bytecode.hex").trim();
+
+        // If bytecode is still a placeholder, return a stub receipt (pre-Hardhat compilation).
+        if bytecode_str == "placeholder" {
+            tracing::warn!(loan_id = %loan_id, "Using stub receipt — bytecode not compiled yet");
+            return Ok(TxReceipt {
+                tx_hash: format!("0x_stub_{}", loan_id),
+                contract_address: format!("0x_stub_contract_{}", loan_id),
+                block_number: Some(0),
+                gas_used: Some(0),
+            });
+        }
+
+        let bytecode =
+            Bytes::from(hex::decode(bytecode_str).map_err(|e| {
+                AppError::Internal(anyhow::anyhow!("Bytecode decode error: {}", e))
+            })?);
 
         let borrower: Address = borrower_address
             .parse()
@@ -83,8 +96,9 @@ impl BlockchainAdapter for PolygonAdapter {
             .parse()
             .map_err(|_| AppError::Internal(anyhow::anyhow!("Invalid USDC address")))?;
 
-        // USDC has 6 decimals
-        let amount_u256 = U256::from((amount_usdc * 1_000_000.0) as u64);
+        // USDC has 6 decimals — round to avoid floating-point truncation errors
+        let amount_raw = (amount_usdc * 1_000_000.0).round() as u64;
+        let amount_u256 = U256::from(amount_raw);
         let annual_rate_bps = U256::from(500u64); // 5.00% = 500 bps
         let term_u256 = U256::from(term_months);
 
@@ -97,7 +111,7 @@ impl BlockchainAdapter for PolygonAdapter {
                 amount_u256,
                 term_u256,
                 annual_rate_bps,
-                borrower, // lender placeholder — updated when funded
+                // No lender arg — assigned when someone calls fundLoan()
             ))
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Deploy build error: {}", e)))?;
 

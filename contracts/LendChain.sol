@@ -11,7 +11,7 @@ contract LendChain is ReentrancyGuard {
     // ── State ──────────────────────────────────────────────────────────────
     IERC20  public immutable usdc;
     address public immutable borrower;
-    address public immutable lender;     // set at construction or fundLoan
+    address public lender;           // assigned when funded, not at construction
     uint256 public immutable amountUsdc; // principal in USDC (6 decimals)
     uint256 public immutable termMonths;
     uint256 public immutable annualRateBps; // e.g. 500 = 5.00%
@@ -42,28 +42,28 @@ contract LendChain is ReentrancyGuard {
         address _borrower,
         uint256 _amountUsdc,
         uint256 _termMonths,
-        uint256 _annualRateBps,
-        address _lender
+        uint256 _annualRateBps
     ) {
         usdc           = IERC20(_usdc);
         borrower       = _borrower;
         amountUsdc     = _amountUsdc;
         termMonths     = _termMonths;
         annualRateBps  = _annualRateBps;
-        lender         = _lender;
         status         = Status.PENDING;
         emit LoanCreated(_borrower, _amountUsdc, _termMonths);
     }
 
-    /// @notice Lender calls this to transfer USDC to the borrower.
+    /// @notice Anyone can fund the loan — first caller becomes the lender.
     function fundLoan() external nonReentrant {
-        if (msg.sender != lender)        revert NotLender();
-        if (status != Status.PENDING)    revert LoanNotPending();
-        if (usdc.allowance(msg.sender, address(this)) < amountUsdc)
-            revert InsufficientAllowance();
+        if (status != Status.PENDING)  revert LoanNotPending();
+        if (lender != address(0))      revert LoanNotPending(); // already funded
 
+        lender   = msg.sender;
         status   = Status.FUNDED;
         fundedAt = block.timestamp;
+
+        if (usdc.allowance(msg.sender, address(this)) < amountUsdc)
+            revert InsufficientAllowance();
 
         bool ok = usdc.transferFrom(msg.sender, borrower, amountUsdc);
         if (!ok) revert TransferFailed();
