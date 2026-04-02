@@ -1,13 +1,77 @@
 use std::sync::Arc;
 
 use actix_web::web;
+use async_trait::async_trait;
 use sqlx::PgPool;
+use uuid::Uuid;
 
-use lendchain_backend::blockchain::{polygon::PolygonAdapter, BlockchainAdapter};
+use lendchain_backend::blockchain::{BlockchainAdapter, OnChainLoanState, TxReceipt};
 use lendchain_backend::config::Config;
 
 /// Convenience alias so test files don't need to import actix internals.
 pub type TestResponse = actix_web::dev::ServiceResponse;
+
+/// Stub blockchain adapter used in all integration tests.
+/// All methods return hardcoded receipts — no real network calls are made.
+struct StubBlockchainAdapter;
+
+#[async_trait]
+impl BlockchainAdapter for StubBlockchainAdapter {
+    async fn deploy_loan_contract(
+        &self,
+        _loan_id: Uuid,
+        _borrower_address: &str,
+        _amount_usdc: f64,
+        _term_months: u32,
+    ) -> Result<TxReceipt, lendchain_backend::errors::AppError> {
+        Ok(TxReceipt {
+            tx_hash: "0x_stub_deploy_tx".to_string(),
+            contract_address: "0x_stub_contract_address".to_string(),
+            block_number: Some(0),
+            gas_used: Some(0),
+        })
+    }
+
+    async fn fund_loan(
+        &self,
+        contract_address: &str,
+        _lender_address: &str,
+        _amount_usdc: f64,
+    ) -> Result<TxReceipt, lendchain_backend::errors::AppError> {
+        Ok(TxReceipt {
+            tx_hash: "0x_stub_fund_tx".to_string(),
+            contract_address: contract_address.to_string(),
+            block_number: Some(0),
+            gas_used: Some(0),
+        })
+    }
+
+    async fn record_payment(
+        &self,
+        contract_address: &str,
+        _payment_number: u32,
+        _amount_usdc: f64,
+    ) -> Result<TxReceipt, lendchain_backend::errors::AppError> {
+        Ok(TxReceipt {
+            tx_hash: "0x_stub_payment_tx".to_string(),
+            contract_address: contract_address.to_string(),
+            block_number: Some(0),
+            gas_used: Some(0),
+        })
+    }
+
+    async fn get_loan_state(
+        &self,
+        contract_address: &str,
+    ) -> Result<OnChainLoanState, lendchain_backend::errors::AppError> {
+        Ok(OnChainLoanState {
+            contract_address: contract_address.to_string(),
+            is_funded: false,
+            is_repaid: false,
+            total_repaid_usdc: 0.0,
+        })
+    }
+}
 
 pub fn test_encryption_key() -> &'static str {
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -27,6 +91,8 @@ pub fn test_config() -> Config {
         cors_origins: vec!["http://localhost:3000".into()],
         environment: "test".into(),
         log_level: "info".into(),
+        deployer_private_key: "0000000000000000000000000000000000000000000000000000000000000001"
+            .into(),
     }
 }
 
@@ -54,6 +120,7 @@ pub async fn truncate_tables(pool: &PgPool) {
 }
 
 /// Build and initialise an in-memory Actix-web service backed by the given pool.
+/// Uses StubBlockchainAdapter — no real blockchain calls are made during tests.
 pub async fn spawn_app(
     pool: PgPool,
 ) -> impl actix_web::dev::Service<
@@ -61,11 +128,7 @@ pub async fn spawn_app(
     Response = actix_web::dev::ServiceResponse,
     Error = actix_web::Error,
 > {
-    let blockchain: Arc<dyn BlockchainAdapter> = Arc::new(PolygonAdapter::new(
-        "https://rpc.stub.example.com".to_string(),
-        80001,
-        "0x0000000000000000000000000000000000000000".to_string(),
-    ));
+    let blockchain: Arc<dyn BlockchainAdapter> = Arc::new(StubBlockchainAdapter);
 
     actix_web::test::init_service(
         actix_web::App::new()

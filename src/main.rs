@@ -49,7 +49,8 @@ async fn main() -> anyhow::Result<()> {
     let blockchain: Arc<dyn BlockchainAdapter> = Arc::new(PolygonAdapter::new(
         config.polygon_rpc_url.clone(),
         config.polygon_chain_id,
-        config.polygon_contract_address.clone(),
+        config.usdc_contract_address_polygon.clone(),
+        config.deployer_private_key.clone(),
     ));
 
     // ─── Shared state ─────────────────────────────────────────────────────────
