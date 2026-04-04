@@ -80,6 +80,17 @@ impl ResponseError for AppError {
                 tracing::error!(error = %e, "Internal error");
                 "An internal error occurred".to_string()
             }
+            AppError::BlockchainTxFailed(msg) => {
+                tracing::error!(error = %msg, "Blockchain transaction failed");
+                if msg.contains("insufficient funds") || msg.contains("gas") {
+                    "Fondos insuficientes para pagar el gas de la transacción".to_string()
+                } else {
+                    format!("La transacción blockchain falló: {}", msg)
+                }
+            }
+            AppError::BlockchainTimeout => {
+                "La blockchain no respondió a tiempo. Intenta de nuevo en unos minutos.".to_string()
+            }
             other => other.to_string(),
         };
 
