@@ -104,7 +104,7 @@ impl BlockchainAdapter for PolygonAdapter {
 
         let factory = ContractFactory::new(abi, bytecode, client);
 
-        let deployer = factory
+        let mut deployer = factory
             .deploy((
                 usdc_addr,
                 borrower,
@@ -114,6 +114,7 @@ impl BlockchainAdapter for PolygonAdapter {
                 // No lender arg — assigned when someone calls fundLoan()
             ))
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Deploy build error: {}", e)))?;
+        deployer.tx.set_gas(U256::from(3_000_000u64));
 
         let (contract, receipt) = deployer
             .send_with_receipt()
