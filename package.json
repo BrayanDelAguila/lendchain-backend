@@ -1,0 +1,29 @@
+{
+  "name": "lendchain-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "compile": "cd hardhat && npx hardhat compile && cd .. && node scripts/extract-artifacts.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BrayanDelAguila/lendchain-backend.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/BrayanDelAguila/lendchain-backend/issues"
+  },
+  "homepage": "https://github.com/BrayanDelAguila/lendchain-backend#readme",
+  "devDependencies": {
+    "@openzeppelin/contracts": "^5.6.1",
+    "hardhat": "^3.3.0"
+  }
+}

@@ -1,3 +1,11 @@
 /target/
 **/*.rs.bk
 .env
+
+# Hardhat
+artifacts/
+cache/
+hardhat/artifacts/
+hardhat/cache/
+hardhat/node_modules/
+node_modules/
