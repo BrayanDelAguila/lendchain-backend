@@ -9,6 +9,7 @@ use ethers::{
     signers::{LocalWallet, Signer},
     types::{Address, Bytes, U256},
 };
+use tokio::time::{timeout, Duration};
 use uuid::Uuid;
 
 use crate::blockchain::{BlockchainAdapter, OnChainLoanState, TxReceipt};
@@ -116,10 +117,18 @@ impl BlockchainAdapter for PolygonAdapter {
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Deploy build error: {}", e)))?;
         deployer.tx.set_gas(U256::from(3_000_000u64));
 
-        let (contract, receipt) = deployer
-            .send_with_receipt()
-            .await
-            .map_err(|e| AppError::BlockchainTxFailed(e.to_string()))?;
+        let deploy_result = timeout(Duration::from_secs(30), deployer.send_with_receipt()).await;
+
+        let (contract, receipt) = match deploy_result {
+            Ok(Ok(result)) => result,
+            Ok(Err(e)) => {
+                return Err(AppError::BlockchainTxFailed(format!(
+                    "Transaction failed: {}",
+                    e
+                )))
+            }
+            Err(_) => return Err(AppError::BlockchainTimeout),
+        };
 
         tracing::info!(
             loan_id = %loan_id,
@@ -187,12 +196,20 @@ impl BlockchainAdapter for PolygonAdapter {
 
         let contract = Contract::new(addr, abi, client);
 
-        let (status, total_repaid, _funded_at, _amount): (u8, U256, U256, U256) = contract
-            .method::<_, (u8, U256, U256, U256)>("getState", ())
-            .map_err(|e| AppError::Internal(anyhow::anyhow!("Method lookup error: {}", e)))?
-            .call()
-            .await
-            .map_err(|e| AppError::BlockchainTxFailed(e.to_string()))?;
+        let state_result = timeout(
+            Duration::from_secs(15),
+            contract
+                .method::<_, (u8, U256, U256, U256)>("getState", ())
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Method lookup error: {}", e)))?
+                .call(),
+        )
+        .await;
+
+        let (status, total_repaid, _funded_at, _amount) = match state_result {
+            Ok(Ok(result)) => result,
+            Ok(Err(e)) => return Err(AppError::BlockchainTxFailed(e.to_string())),
+            Err(_) => return Err(AppError::BlockchainTimeout),
+        };
 
         Ok(OnChainLoanState {
             contract_address: contract_address.to_string(),
