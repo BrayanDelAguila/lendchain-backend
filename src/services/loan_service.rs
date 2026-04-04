@@ -209,7 +209,7 @@ pub fn polygonscan_url(chain_id: u64, tx_hash: &str) -> String {
     let base = if chain_id == 137 {
         "https://polygonscan.com"
     } else {
-        "https://mumbai.polygonscan.com"
+        "https://amoy.polygonscan.com"
     };
     format!("{}/tx/{}", base, tx_hash)
 }

@@ -208,8 +208,8 @@ mod tests {
 
     fn make_adapter() -> PolygonAdapter {
         PolygonAdapter::new(
-            "https://rpc-mumbai.example.com".to_string(),
-            80001,
+            "https://rpc-amoy.example.com".to_string(),
+            80002,
             "0x0000000000000000000000000000000000000000".to_string(),
             // Valid-format private key (all zeroes + 1) — no funds, never touches network
             "0000000000000000000000000000000000000000000000000000000000000001".to_string(),
@@ -229,8 +229,8 @@ mod tests {
     #[test]
     fn test_provider_fails_with_invalid_key() {
         let adapter = PolygonAdapter::new(
-            "https://rpc-mumbai.example.com".to_string(),
-            80001,
+            "https://rpc-amoy.example.com".to_string(),
+            80002,
             "0x0000000000000000000000000000000000000000".to_string(),
             "not_a_valid_hex_private_key".to_string(),
         );
