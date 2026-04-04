@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tokio::time::{timeout, Duration};
 use ethers::{
     abi::Abi,
     contract::{Contract, ContractFactory},
@@ -10,6 +9,7 @@ use ethers::{
     signers::{LocalWallet, Signer},
     types::{Address, Bytes, U256},
 };
+use tokio::time::{timeout, Duration};
 use uuid::Uuid;
 
 use crate::blockchain::{BlockchainAdapter, OnChainLoanState, TxReceipt};
@@ -117,16 +117,16 @@ impl BlockchainAdapter for PolygonAdapter {
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Deploy build error: {}", e)))?;
         deployer.tx.set_gas(U256::from(3_000_000u64));
 
-        let deploy_result = timeout(
-            Duration::from_secs(30),
-            deployer.send_with_receipt(),
-        ).await;
+        let deploy_result = timeout(Duration::from_secs(30), deployer.send_with_receipt()).await;
 
         let (contract, receipt) = match deploy_result {
             Ok(Ok(result)) => result,
-            Ok(Err(e)) => return Err(AppError::BlockchainTxFailed(
-                format!("Transaction failed: {}", e)
-            )),
+            Ok(Err(e)) => {
+                return Err(AppError::BlockchainTxFailed(format!(
+                    "Transaction failed: {}",
+                    e
+                )))
+            }
             Err(_) => return Err(AppError::BlockchainTimeout),
         };
 
@@ -202,7 +202,8 @@ impl BlockchainAdapter for PolygonAdapter {
                 .method::<_, (u8, U256, U256, U256)>("getState", ())
                 .map_err(|e| AppError::Internal(anyhow::anyhow!("Method lookup error: {}", e)))?
                 .call(),
-        ).await;
+        )
+        .await;
 
         let (status, total_repaid, _funded_at, _amount) = match state_result {
             Ok(Ok(result)) => result,
