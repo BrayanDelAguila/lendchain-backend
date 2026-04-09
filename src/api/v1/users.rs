@@ -107,7 +107,8 @@ pub async fn refresh(
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "success": true,
         "data": {
-            "access_token": token_data.access_token
+            "access_token": token_data.access_token,
+            "refresh_token": token_data.refresh_token
         }
     })))
 }

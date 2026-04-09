@@ -34,6 +34,7 @@ pub struct AuthResponse {
 
 pub struct RefreshTokenData {
     pub access_token: String,
+    pub refresh_token: String,
 }
 
 // ─── SHA-256 hash for refresh tokens (stored in DB, never the raw token) ──────
@@ -116,7 +117,7 @@ pub async fn login(
     })
 }
 
-/// Validate a refresh token and issue a new access token.
+/// Validate a refresh token, revoke it, and issue a rotated token pair.
 pub async fn refresh_token(
     pool: &PgPool,
     refresh_token: &str,
@@ -124,18 +125,27 @@ pub async fn refresh_token(
 ) -> Result<RefreshTokenData, AppError> {
     let token_hash = sha256_hex(refresh_token);
 
+    // 1. Buscar y validar el refresh token en DB
     let user_id = db::find_valid_refresh_token(pool, &token_hash)
         .await?
         .ok_or(AppError::Unauthorized)?;
 
-    let user = db::find_by_id(pool, user_id)
+    // 2. Revocar el token usado inmediatamente (previene replay attacks)
+    db::revoke_refresh_token(pool, &token_hash).await?;
+
+    // 3. Buscar el usuario
+    let user = crate::db::users::find_by_id(pool, user_id)
         .await?
         .ok_or(AppError::Unauthorized)?;
 
-    let access_token = generate_access_token(user.id, &user.email, &user.role, jwt_secret)
-        .map_err(AppError::Internal)?;
+    // 4. Emitir nuevo access token + nuevo refresh token rotado
+    let (access_token, new_refresh_token) =
+        issue_tokens(pool, &user.id, &user.email, &user.role, jwt_secret).await?;
 
-    Ok(RefreshTokenData { access_token })
+    Ok(RefreshTokenData {
+        access_token,
+        refresh_token: new_refresh_token,
+    })
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
