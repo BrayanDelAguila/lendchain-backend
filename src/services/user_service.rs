@@ -32,6 +32,10 @@ pub struct AuthResponse {
     pub refresh_token: String,
 }
 
+pub struct RefreshTokenData {
+    pub access_token: String,
+}
+
 // ─── SHA-256 hash for refresh tokens (stored in DB, never the raw token) ──────
 
 fn sha256_hex(input: &str) -> String {
@@ -110,6 +114,28 @@ pub async fn login(
         access_token,
         refresh_token,
     })
+}
+
+/// Validate a refresh token and issue a new access token.
+pub async fn refresh_token(
+    pool: &PgPool,
+    refresh_token: &str,
+    jwt_secret: &str,
+) -> Result<RefreshTokenData, AppError> {
+    let token_hash = sha256_hex(refresh_token);
+
+    let user_id = db::find_valid_refresh_token(pool, &token_hash)
+        .await?
+        .ok_or(AppError::Unauthorized)?;
+
+    let user = db::find_by_id(pool, user_id)
+        .await?
+        .ok_or(AppError::Unauthorized)?;
+
+    let access_token = generate_access_token(user.id, &user.email, &user.role, jwt_secret)
+        .map_err(AppError::Internal)?;
+
+    Ok(RefreshTokenData { access_token })
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────

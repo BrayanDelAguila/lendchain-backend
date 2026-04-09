@@ -30,6 +30,11 @@ pub struct LoginBody {
     pub password: String,
 }
 
+#[derive(Deserialize)]
+pub struct RefreshBody {
+    pub refresh_token: String,
+}
+
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
 /// POST /api/v1/users/register
@@ -90,6 +95,23 @@ pub async fn login(
     })))
 }
 
+/// POST /api/v1/users/refresh
+pub async fn refresh(
+    pool: web::Data<PgPool>,
+    config: web::Data<Config>,
+    body: web::Json<RefreshBody>,
+) -> Result<HttpResponse, AppError> {
+    let token_data =
+        user_service::refresh_token(&pool, &body.refresh_token, &config.jwt_secret).await?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "data": {
+            "access_token": token_data.access_token
+        }
+    })))
+}
+
 /// GET /api/v1/users/me
 pub async fn me(
     pool: web::Data<PgPool>,
@@ -115,6 +137,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         web::scope("/users")
             .route("/register", web::post().to(register))
             .route("/login", web::post().to(login))
+            .route("/refresh", web::post().to(refresh))
             .route("/me", web::get().to(me)),
     );
 }
