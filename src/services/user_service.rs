@@ -132,9 +132,8 @@ pub async fn refresh_token(
         .await?
         .ok_or(AppError::Unauthorized)?;
 
-    let access_token =
-        generate_access_token(user.id, &user.email, &user.role, jwt_secret)
-            .map_err(AppError::Internal)?;
+    let access_token = generate_access_token(user.id, &user.email, &user.role, jwt_secret)
+        .map_err(AppError::Internal)?;
 
     Ok(RefreshTokenData { access_token })
 }

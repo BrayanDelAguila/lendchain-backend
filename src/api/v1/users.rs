@@ -101,12 +101,8 @@ pub async fn refresh(
     config: web::Data<Config>,
     body: web::Json<RefreshBody>,
 ) -> Result<HttpResponse, AppError> {
-    let token_data = user_service::refresh_token(
-        &pool,
-        &body.refresh_token,
-        &config.jwt_secret,
-    )
-    .await?;
+    let token_data =
+        user_service::refresh_token(&pool, &body.refresh_token, &config.jwt_secret).await?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "success": true,
