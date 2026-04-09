@@ -116,6 +116,7 @@ impl BlockchainAdapter for PolygonAdapter {
             ))
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Deploy build error: {}", e)))?;
         deployer.tx.set_gas(U256::from(3_000_000u64));
+        deployer.tx.set_gas_price(U256::from(35_000_000_000u64)); // 35 gwei
 
         let deploy_result = timeout(Duration::from_secs(30), deployer.send_with_receipt()).await;
 
