@@ -41,12 +41,30 @@ pub async fn list_loans(
     })))
 }
 
-/// GET /api/v1/loans/available — public list of loans available to fund.
+/// GET /api/v1/loans/available — authenticated list of loans available to fund (excludes own).
 pub async fn list_available_loans(
     pool: web::Data<PgPool>,
+    auth: AuthenticatedUser,
     query: web::Query<PaginationQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let page = loan_service::list_available(&pool, query.cursor, query.limit).await?;
+    let user_id: Uuid = auth.0.sub.parse().map_err(|_| AppError::Unauthorized)?;
+    let page = loan_service::list_available(&pool, user_id, query.cursor, query.limit).await?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "data": page.items,
+        "next_cursor": page.next_cursor
+    })))
+}
+
+/// GET /api/v1/loans/portfolio — loans where the authenticated user is the lender.
+pub async fn list_portfolio(
+    pool: web::Data<PgPool>,
+    auth: AuthenticatedUser,
+    query: web::Query<PaginationQuery>,
+) -> Result<HttpResponse, AppError> {
+    let user_id: Uuid = auth.0.sub.parse().map_err(|_| AppError::Unauthorized)?;
+    let page = loan_service::list_portfolio(&pool, user_id, query.cursor, query.limit).await?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "success": true,
@@ -267,6 +285,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("", web::get().to(list_loans))
             .route("", web::post().to(create_loan))
             .route("/available", web::get().to(list_available_loans))
+            .route("/portfolio", web::get().to(list_portfolio))
             .route("/{id}", web::get().to(get_loan))
             .route("/{id}/schedule", web::get().to(get_loan_schedule))
             .route("/{id}/fund", web::post().to(fund_loan))

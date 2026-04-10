@@ -88,9 +88,10 @@ pub async fn list_by_borrower(
     }
 }
 
-/// List loans in PENDING status (available to fund), newest first, cursor-based.
+/// List loans in PENDING status available to fund, excluding the caller's own loans.
 pub async fn list_available(
     pool: &PgPool,
+    exclude_user_id: Uuid,
     cursor_id: Option<Uuid>,
     limit: i64,
 ) -> Result<Vec<Loan>, sqlx::Error> {
@@ -99,13 +100,15 @@ pub async fn list_available(
             r#"
             SELECT * FROM loans
             WHERE status = 'PENDING'
+              AND borrower_id != $1
               AND (created_at, id) < (
-                  SELECT created_at, id FROM loans WHERE id = $1
+                  SELECT created_at, id FROM loans WHERE id = $2
               )
             ORDER BY created_at DESC, id DESC
-            LIMIT $2
+            LIMIT $3
             "#,
         )
+        .bind(exclude_user_id)
         .bind(cursor)
         .bind(limit)
         .fetch_all(pool)
@@ -115,10 +118,52 @@ pub async fn list_available(
             r#"
             SELECT * FROM loans
             WHERE status = 'PENDING'
+              AND borrower_id != $1
             ORDER BY created_at DESC, id DESC
-            LIMIT $1
+            LIMIT $2
             "#,
         )
+        .bind(exclude_user_id)
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+    }
+}
+
+/// List loans where the user is the lender (portfolio view), newest first.
+pub async fn list_by_lender(
+    pool: &PgPool,
+    lender_id: Uuid,
+    cursor_id: Option<Uuid>,
+    limit: i64,
+) -> Result<Vec<Loan>, sqlx::Error> {
+    if let Some(cursor) = cursor_id {
+        sqlx::query_as::<_, Loan>(
+            r#"
+            SELECT * FROM loans
+            WHERE lender_id = $1
+              AND (created_at, id) < (
+                  SELECT created_at, id FROM loans WHERE id = $2
+              )
+            ORDER BY created_at DESC, id DESC
+            LIMIT $3
+            "#,
+        )
+        .bind(lender_id)
+        .bind(cursor)
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+    } else {
+        sqlx::query_as::<_, Loan>(
+            r#"
+            SELECT * FROM loans
+            WHERE lender_id = $1
+            ORDER BY created_at DESC, id DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(lender_id)
         .bind(limit)
         .fetch_all(pool)
         .await
