@@ -118,7 +118,7 @@ impl BlockchainAdapter for PolygonAdapter {
         deployer.tx.set_gas(U256::from(1_500_000u64));
         deployer.tx.set_gas_price(U256::from(35_000_000_000u64)); // 35 gwei
 
-        let deploy_result = timeout(Duration::from_secs(30), deployer.send_with_receipt()).await;
+        let deploy_result = timeout(Duration::from_secs(60), deployer.send_with_receipt()).await;
 
         let (contract, receipt) = match deploy_result {
             Ok(Ok(result)) => result,
