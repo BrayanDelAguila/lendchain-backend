@@ -138,24 +138,22 @@ pub async fn me_stats(
     auth: AuthenticatedUser,
 ) -> Result<HttpResponse, AppError> {
     let user_id: Uuid = auth.0.sub.parse().map_err(|_| AppError::Unauthorized)?;
-
-    let b = crate::db::loans::borrower_stats(&pool, user_id).await?;
-    let l = crate::db::loans::lender_stats(&pool, user_id).await?;
+    let stats = crate::services::loan_service::get_user_stats(&pool, user_id).await?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "success": true,
         "data": {
             "borrower": {
-                "total_loans": b.total_loans,
-                "active_loans": b.active_loans,
-                "pending_loans": b.pending_loans,
-                "total_borrowed_usdc": b.total_borrowed_usdc
+                "total_loans": stats.borrower.total_loans,
+                "funded_loans": stats.borrower.funded_loans,
+                "pending_loans": stats.borrower.pending_loans,
+                "total_borrowed_usdc": stats.borrower.total_borrowed_usdc
             },
             "lender": {
-                "total_investments": l.total_investments,
-                "active_investments": l.active_investments,
-                "total_invested_usdc": l.total_invested_usdc,
-                "total_interest_earned_usdc": l.total_interest_earned_usdc
+                "total_investments": stats.lender.total_investments,
+                "active_investments": stats.lender.active_investments,
+                "total_invested_usdc": stats.lender.total_invested_usdc,
+                "total_interest_earned_usdc": stats.lender.total_interest_earned_usdc
             }
         }
     })))

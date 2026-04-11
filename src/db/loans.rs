@@ -246,7 +246,7 @@ pub async fn list_history(
 #[derive(Debug, sqlx::FromRow)]
 pub struct BorrowerStatsRow {
     pub total_loans: i64,
-    pub active_loans: i64,
+    pub funded_loans: i64,
     pub pending_loans: i64,
     pub total_borrowed_usdc: BigDecimal,
 }
@@ -256,7 +256,7 @@ pub async fn borrower_stats(pool: &PgPool, user_id: Uuid) -> Result<BorrowerStat
         r#"
         SELECT
             COUNT(*)                                      AS total_loans,
-            COUNT(*) FILTER (WHERE status = 'FUNDED')    AS active_loans,
+            COUNT(*) FILTER (WHERE status = 'FUNDED')    AS funded_loans,
             COUNT(*) FILTER (WHERE status = 'PENDING')   AS pending_loans,
             COALESCE(SUM(amount_usdc), 0)                AS total_borrowed_usdc
         FROM loans

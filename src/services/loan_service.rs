@@ -228,6 +228,18 @@ pub async fn list_history(
     Ok(Page { items, next_cursor })
 }
 
+/// Aggregated stats for a user across both borrower and lender roles.
+pub struct UserStats {
+    pub borrower: crate::db::loans::BorrowerStatsRow,
+    pub lender: crate::db::loans::LenderStatsRow,
+}
+
+pub async fn get_user_stats(pool: &PgPool, user_id: Uuid) -> Result<UserStats, AppError> {
+    let borrower = crate::db::loans::borrower_stats(pool, user_id).await?;
+    let lender = crate::db::loans::lender_stats(pool, user_id).await?;
+    Ok(UserStats { borrower, lender })
+}
+
 /// Return the full amortisation schedule for a loan.
 /// Any authenticated user may view the schedule (no ownership check).
 pub async fn get_schedule(pool: &PgPool, id: Uuid) -> Result<Vec<ScheduleRow>, AppError> {
