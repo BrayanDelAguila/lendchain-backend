@@ -16,6 +16,14 @@ use crate::utils::calculator;
 const DEFAULT_LIMIT: i64 = 20;
 const MAX_LIMIT: i64 = 100;
 
+/// A loan item in the unified history, tagged with the caller's role.
+#[derive(Debug, Serialize)]
+pub struct HistoryItem {
+    #[serde(flatten)]
+    pub loan: Loan,
+    pub role: String,
+}
+
 /// A single row in the amortisation schedule response.
 #[derive(Debug, Serialize)]
 pub struct ScheduleRow {
@@ -181,6 +189,38 @@ pub async fn list_portfolio(
     let next_cursor = if items.len() as i64 > limit {
         items.truncate(limit as usize);
         items.last().map(|l| l.id)
+    } else {
+        None
+    };
+
+    Ok(Page { items, next_cursor })
+}
+
+/// Unified history of all loans for a user (borrower + lender), with role tag.
+pub async fn list_history(
+    pool: &PgPool,
+    user_id: Uuid,
+    cursor: Option<Uuid>,
+    limit: Option<i64>,
+) -> Result<Page<HistoryItem>, AppError> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+    let loans = db_loans::list_history(pool, user_id, cursor, limit + 1).await?;
+
+    let mut items: Vec<HistoryItem> = loans
+        .into_iter()
+        .map(|loan| {
+            let role = if loan.borrower_id == user_id {
+                "borrower".to_string()
+            } else {
+                "lender".to_string()
+            };
+            HistoryItem { loan, role }
+        })
+        .collect();
+
+    let next_cursor = if items.len() as i64 > limit {
+        items.truncate(limit as usize);
+        items.last().map(|h| h.loan.id)
     } else {
         None
     };

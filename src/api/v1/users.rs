@@ -132,6 +132,35 @@ pub async fn me(
     })))
 }
 
+/// GET /api/v1/users/me/stats
+pub async fn me_stats(
+    pool: web::Data<PgPool>,
+    auth: AuthenticatedUser,
+) -> Result<HttpResponse, AppError> {
+    let user_id: Uuid = auth.0.sub.parse().map_err(|_| AppError::Unauthorized)?;
+
+    let b = crate::db::loans::borrower_stats(&pool, user_id).await?;
+    let l = crate::db::loans::lender_stats(&pool, user_id).await?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "data": {
+            "borrower": {
+                "total_loans": b.total_loans,
+                "active_loans": b.active_loans,
+                "pending_loans": b.pending_loans,
+                "total_borrowed_usdc": b.total_borrowed_usdc
+            },
+            "lender": {
+                "total_investments": l.total_investments,
+                "active_investments": l.active_investments,
+                "total_invested_usdc": l.total_invested_usdc,
+                "total_interest_earned_usdc": l.total_interest_earned_usdc
+            }
+        }
+    })))
+}
+
 /// Configure user routes.
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -139,6 +168,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/register", web::post().to(register))
             .route("/login", web::post().to(login))
             .route("/refresh", web::post().to(refresh))
-            .route("/me", web::get().to(me)),
+            .route("/me", web::get().to(me))
+            .route("/me/stats", web::get().to(me_stats)),
     );
 }
