@@ -273,9 +273,33 @@ async fn test_get_loan_forbidden_other_user() {
 
 // ── Available loans & schedule ────────────────────────────────────────────────
 
-/// GET /loans/available should return 200 (publicly accessible).
+/// GET /loans/available should return 200 for authenticated users.
 #[tokio::test]
-async fn test_list_available_loans_public() {
+async fn test_list_available_loans_authenticated() {
+    let pool = match common::get_test_pool().await {
+        Some(p) => p,
+        None => return,
+    };
+    common::truncate_tables(&pool).await;
+    let token = common::create_test_user_token(pool.clone()).await;
+    let app = common::spawn_app(pool).await;
+
+    let req = test::TestRequest::get()
+        .uri("/api/v1/loans/available")
+        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .to_request();
+
+    let resp: common::TestResponse = test::call_service(&app, req).await;
+    assert!(
+        resp.status().is_success(),
+        "GET /loans/available should return 200 for authenticated users, got {}",
+        resp.status()
+    );
+}
+
+/// GET /loans/available should return 401 for unauthenticated requests.
+#[tokio::test]
+async fn test_list_available_loans_requires_auth() {
     let pool = match common::get_test_pool().await {
         Some(p) => p,
         None => return,
@@ -288,9 +312,10 @@ async fn test_list_available_loans_public() {
         .to_request();
 
     let resp: common::TestResponse = test::call_service(&app, req).await;
-    assert!(
-        resp.status().is_success(),
-        "GET /loans/available should be publicly accessible, got {}",
+    assert_eq!(
+        resp.status(),
+        actix_web::http::StatusCode::UNAUTHORIZED,
+        "GET /loans/available should require authentication, got {}",
         resp.status()
     );
 }
