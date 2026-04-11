@@ -148,14 +148,35 @@ pub async fn list_loans(
     Ok(Page { items, next_cursor })
 }
 
-/// List loans available to fund (status = PENDING, cursor-based pagination).
+/// List loans available to fund (status = PENDING, excluding caller's own loans).
 pub async fn list_available(
     pool: &PgPool,
+    exclude_user_id: Uuid,
     cursor: Option<Uuid>,
     limit: Option<i64>,
 ) -> Result<Page<Loan>, AppError> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
-    let mut items = db_loans::list_available(pool, cursor, limit + 1).await?;
+    let mut items = db_loans::list_available(pool, exclude_user_id, cursor, limit + 1).await?;
+
+    let next_cursor = if items.len() as i64 > limit {
+        items.truncate(limit as usize);
+        items.last().map(|l| l.id)
+    } else {
+        None
+    };
+
+    Ok(Page { items, next_cursor })
+}
+
+/// List loans where the user is the lender (portfolio view).
+pub async fn list_portfolio(
+    pool: &PgPool,
+    lender_id: Uuid,
+    cursor: Option<Uuid>,
+    limit: Option<i64>,
+) -> Result<Page<Loan>, AppError> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+    let mut items = db_loans::list_by_lender(pool, lender_id, cursor, limit + 1).await?;
 
     let next_cursor = if items.len() as i64 > limit {
         items.truncate(limit as usize);

@@ -41,12 +41,30 @@ pub async fn list_loans(
     })))
 }
 
-/// GET /api/v1/loans/available — public list of loans available to fund.
+/// GET /api/v1/loans/available — authenticated list of loans available to fund (excludes own).
 pub async fn list_available_loans(
     pool: web::Data<PgPool>,
+    auth: AuthenticatedUser,
     query: web::Query<PaginationQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let page = loan_service::list_available(&pool, query.cursor, query.limit).await?;
+    let user_id: Uuid = auth.0.sub.parse().map_err(|_| AppError::Unauthorized)?;
+    let page = loan_service::list_available(&pool, user_id, query.cursor, query.limit).await?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "data": page.items,
+        "next_cursor": page.next_cursor
+    })))
+}
+
+/// GET /api/v1/loans/portfolio — loans where the authenticated user is the lender.
+pub async fn list_portfolio(
+    pool: web::Data<PgPool>,
+    auth: AuthenticatedUser,
+    query: web::Query<PaginationQuery>,
+) -> Result<HttpResponse, AppError> {
+    let user_id: Uuid = auth.0.sub.parse().map_err(|_| AppError::Unauthorized)?;
+    let page = loan_service::list_portfolio(&pool, user_id, query.cursor, query.limit).await?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "success": true,
@@ -99,15 +117,25 @@ pub async fn get_loan(
     })))
 }
 
-/// GET /api/v1/loans/{id}/schedule — amortisation table (authenticated).
+/// GET /api/v1/loans/{id}/schedule — amortisation table (borrower or lender only).
 pub async fn get_loan_schedule(
     pool: web::Data<PgPool>,
-    _auth: AuthenticatedUser,
+    auth: AuthenticatedUser,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
+    let user_id: Uuid = auth.0.sub.parse().map_err(|_| AppError::Unauthorized)?;
     let loan_id = path.into_inner();
-    let schedule = loan_service::get_schedule(&pool, loan_id).await?;
 
+    // Verify the loan exists and the caller is borrower or lender
+    let loan = crate::db::loans::find_by_id(&pool, loan_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+    if loan.borrower_id != user_id && loan.lender_id != Some(user_id) {
+        return Err(AppError::Forbidden);
+    }
+
+    let schedule = loan_service::get_schedule(&pool, loan_id).await?;
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "success": true,
         "data": schedule
@@ -132,6 +160,11 @@ pub async fn fund_loan(
     if loan.status != "PENDING" {
         return Err(AppError::InvalidState(
             "Loan is not in PENDING status".into(),
+        ));
+    }
+    if loan.lender_id.is_some() {
+        return Err(AppError::InvalidState(
+            "Loan has already been funded".into(),
         ));
     }
     if loan.borrower_id == lender_id {
@@ -267,6 +300,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("", web::get().to(list_loans))
             .route("", web::post().to(create_loan))
             .route("/available", web::get().to(list_available_loans))
+            .route("/portfolio", web::get().to(list_portfolio))
             .route("/{id}", web::get().to(get_loan))
             .route("/{id}/schedule", web::get().to(get_loan_schedule))
             .route("/{id}/fund", web::post().to(fund_loan))
