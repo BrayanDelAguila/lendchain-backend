@@ -13,6 +13,7 @@ use crate::errors::AppError;
 use crate::middleware::auth::AuthenticatedUser;
 use crate::models::loan::CreateLoanBody;
 use crate::services::loan_service;
+use crate::services::loan_service::polygonscan_url;
 
 // ─── Query params ─────────────────────────────────────────────────────────────
 
@@ -100,9 +101,26 @@ pub async fn create_loan(
     })))
 }
 
+/// GET /api/v1/loans/history — unified history of loans (borrower + lender).
+pub async fn list_history(
+    pool: web::Data<PgPool>,
+    auth: AuthenticatedUser,
+    query: web::Query<PaginationQuery>,
+) -> Result<HttpResponse, AppError> {
+    let user_id: Uuid = auth.0.sub.parse().map_err(|_| AppError::Unauthorized)?;
+    let page = loan_service::list_history(&pool, user_id, query.cursor, query.limit).await?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "data": page.items,
+        "next_cursor": page.next_cursor
+    })))
+}
+
 /// GET /api/v1/loans/{id} — get a specific loan (borrower or lender only).
 pub async fn get_loan(
     pool: web::Data<PgPool>,
+    config: web::Data<Config>,
     auth: AuthenticatedUser,
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
@@ -111,9 +129,20 @@ pub async fn get_loan(
 
     let loan = loan_service::get_loan(&pool, loan_id, user_id).await?;
 
+    let polygonscan_url_deploy = loan
+        .deploy_tx_hash
+        .as_deref()
+        .map(|h| polygonscan_url(config.polygon_chain_id, h));
+    let polygonscan_url_fund = loan
+        .fund_tx_hash
+        .as_deref()
+        .map(|h| polygonscan_url(config.polygon_chain_id, h));
+
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "success": true,
-        "data": loan
+        "data": loan,
+        "polygonscan_url_deploy": polygonscan_url_deploy,
+        "polygonscan_url_fund": polygonscan_url_fund
     })))
 }
 
@@ -301,6 +330,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("", web::post().to(create_loan))
             .route("/available", web::get().to(list_available_loans))
             .route("/portfolio", web::get().to(list_portfolio))
+            .route("/history", web::get().to(list_history))
             .route("/{id}", web::get().to(get_loan))
             .route("/{id}/schedule", web::get().to(get_loan_schedule))
             .route("/{id}/fund", web::post().to(fund_loan))

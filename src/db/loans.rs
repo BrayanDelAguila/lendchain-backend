@@ -202,6 +202,103 @@ pub async fn update_contract_info(
     Ok(())
 }
 
+/// Unified history of loans where the user is borrower OR lender (newest first).
+pub async fn list_history(
+    pool: &PgPool,
+    user_id: Uuid,
+    cursor_id: Option<Uuid>,
+    limit: i64,
+) -> Result<Vec<Loan>, sqlx::Error> {
+    if let Some(cursor) = cursor_id {
+        sqlx::query_as::<_, Loan>(
+            r#"
+            SELECT * FROM loans
+            WHERE (borrower_id = $1 OR lender_id = $1)
+              AND (created_at, id) < (
+                  SELECT created_at, id FROM loans WHERE id = $2
+              )
+            ORDER BY created_at DESC, id DESC
+            LIMIT $3
+            "#,
+        )
+        .bind(user_id)
+        .bind(cursor)
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+    } else {
+        sqlx::query_as::<_, Loan>(
+            r#"
+            SELECT * FROM loans
+            WHERE borrower_id = $1 OR lender_id = $1
+            ORDER BY created_at DESC, id DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(user_id)
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+    }
+}
+
+/// Aggregated borrower stats for a user.
+#[derive(Debug, sqlx::FromRow)]
+pub struct BorrowerStatsRow {
+    pub total_loans: i64,
+    pub funded_loans: i64,
+    pub pending_loans: i64,
+    pub total_borrowed_usdc: BigDecimal,
+}
+
+pub async fn borrower_stats(pool: &PgPool, user_id: Uuid) -> Result<BorrowerStatsRow, sqlx::Error> {
+    sqlx::query_as::<_, BorrowerStatsRow>(
+        r#"
+        SELECT
+            COUNT(*)                                      AS total_loans,
+            COUNT(*) FILTER (WHERE status = 'FUNDED')    AS funded_loans,
+            COUNT(*) FILTER (WHERE status = 'PENDING')   AS pending_loans,
+            COALESCE(SUM(amount_usdc), 0)                AS total_borrowed_usdc
+        FROM loans
+        WHERE borrower_id = $1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
+}
+
+/// Aggregated lender stats for a user.
+#[derive(Debug, sqlx::FromRow)]
+pub struct LenderStatsRow {
+    pub total_investments: i64,
+    pub active_investments: i64,
+    pub total_invested_usdc: BigDecimal,
+    pub total_interest_earned_usdc: BigDecimal,
+}
+
+pub async fn lender_stats(pool: &PgPool, user_id: Uuid) -> Result<LenderStatsRow, sqlx::Error> {
+    sqlx::query_as::<_, LenderStatsRow>(
+        r#"
+        SELECT
+            COUNT(*)                                      AS total_investments,
+            COUNT(*) FILTER (WHERE status = 'FUNDED')    AS active_investments,
+            COALESCE(SUM(amount_usdc), 0)                AS total_invested_usdc,
+            COALESCE((
+                SELECT SUM(lp.interest)
+                FROM loan_payments lp
+                JOIN loans l2 ON lp.loan_id = l2.id
+                WHERE l2.lender_id = $1 AND lp.status = 'CONFIRMED'
+            ), 0)                                        AS total_interest_earned_usdc
+        FROM loans
+        WHERE lender_id = $1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
+}
+
 /// Update fund info after a lender funds the loan.
 pub async fn update_fund_info(
     pool: &PgPool,
