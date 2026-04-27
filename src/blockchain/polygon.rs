@@ -41,11 +41,17 @@ impl PolygonAdapter {
     }
 
     fn provider(&self) -> Result<Arc<SignerMiddleware<Provider<Http>, LocalWallet>>, AppError> {
+        self.provider_with_key(&self.deployer_private_key)
+    }
+
+    fn provider_with_key(
+        &self,
+        private_key_hex: &str,
+    ) -> Result<Arc<SignerMiddleware<Provider<Http>, LocalWallet>>, AppError> {
         let provider = Provider::<Http>::try_from(self.rpc_url.as_str())
             .map_err(|e| AppError::Internal(anyhow::anyhow!("RPC provider error: {}", e)))?;
 
-        let wallet: LocalWallet = self
-            .deployer_private_key
+        let wallet: LocalWallet = private_key_hex
             .parse::<LocalWallet>()
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Wallet parse error: {}", e)))?
             .with_chain_id(self.chain_id);
@@ -146,41 +152,139 @@ impl BlockchainAdapter for PolygonAdapter {
         })
     }
 
-    /// Transfer USDC from lender to the loan contract.
-    /// TODO Fase 4b: call fundLoan() on the deployed contract once lender wallets are integrated.
+    /// Fund the loan contract by calling fundLoan() with the lender's custodial wallet.
     async fn fund_loan(
         &self,
         contract_address: &str,
-        _lender_address: &str,
-        _amount_usdc: f64,
+        lender_wallet_encrypted: &str,
+        encryption_key: &str,
     ) -> Result<TxReceipt, AppError> {
-        tracing::info!(contract = %contract_address, "fund_loan stub called");
+        // Stub path: encrypted key is a placeholder (test / pre-compilation)
+        if lender_wallet_encrypted.starts_with("0x_stub") {
+            tracing::warn!(contract = %contract_address, "fund_loan stub path (encrypted key placeholder)");
+            return Ok(TxReceipt {
+                tx_hash: "0x_stub_fund_tx".to_string(),
+                contract_address: contract_address.to_string(),
+                block_number: Some(0),
+                gas_used: Some(0),
+            });
+        }
+
+        let private_key =
+            crate::utils::crypto::decrypt_private_key(lender_wallet_encrypted, encryption_key)
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Key decrypt error: {}", e)))?;
+
+        let client = self.provider_with_key(&private_key)?;
+
+        let abi: Abi = serde_json::from_str(include_str!("contracts/lendchain_abi.json"))
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("ABI parse error: {}", e)))?;
+
+        let addr: Address = contract_address
+            .parse()
+            .map_err(|_| AppError::Internal(anyhow::anyhow!("Invalid contract address")))?;
+
+        let contract = Contract::new(addr, abi, client);
+
+        let mut call = contract
+            .method::<_, ()>("fundLoan", ())
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Method error: {}", e)))?;
+        call.tx.set_gas(U256::from(500_000u64));
+        call.tx.set_gas_price(U256::from(35_000_000_000u64));
+
+        let pending = call
+            .send()
+            .await
+            .map_err(|e| AppError::BlockchainTxFailed(e.to_string()))?;
+
+        let receipt_result = timeout(Duration::from_secs(30), pending).await;
+
+        let receipt = match receipt_result {
+            Ok(Ok(Some(r))) => r,
+            Ok(Ok(None)) => return Err(AppError::BlockchainTxFailed("No receipt returned".into())),
+            Ok(Err(e)) => return Err(AppError::BlockchainTxFailed(e.to_string())),
+            Err(_) => return Err(AppError::BlockchainTimeout),
+        };
+
+        tracing::info!(
+            contract = %contract_address,
+            tx = ?receipt.transaction_hash,
+            "fundLoan confirmed"
+        );
+
         Ok(TxReceipt {
-            tx_hash: "0x_stub_fund_tx".to_string(),
+            tx_hash: format!("{:?}", receipt.transaction_hash),
             contract_address: contract_address.to_string(),
-            block_number: Some(0),
-            gas_used: Some(0),
+            block_number: receipt.block_number.map(|b| b.as_u64()),
+            gas_used: receipt.gas_used.map(|g| g.as_u64()),
         })
     }
 
-    /// Record a borrower repayment on the loan contract.
-    /// TODO Fase 4b: call makePayment() on the deployed contract.
+    /// Record a borrower payment on the contract by calling makePayment(amount_usdc).
     async fn record_payment(
         &self,
         contract_address: &str,
-        payment_number: u32,
-        _amount_usdc: f64,
+        borrower_wallet_encrypted: &str,
+        encryption_key: &str,
+        amount_usdc: u64,
     ) -> Result<TxReceipt, AppError> {
+        // Stub path
+        if borrower_wallet_encrypted.starts_with("0x_stub") {
+            tracing::warn!(contract = %contract_address, "record_payment stub path");
+            return Ok(TxReceipt {
+                tx_hash: "0x_stub_payment_tx".to_string(),
+                contract_address: contract_address.to_string(),
+                block_number: Some(0),
+                gas_used: Some(0),
+            });
+        }
+
+        let private_key =
+            crate::utils::crypto::decrypt_private_key(borrower_wallet_encrypted, encryption_key)
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("Key decrypt error: {}", e)))?;
+
+        let client = self.provider_with_key(&private_key)?;
+
+        let abi: Abi = serde_json::from_str(include_str!("contracts/lendchain_abi.json"))
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("ABI parse error: {}", e)))?;
+
+        let addr: Address = contract_address
+            .parse()
+            .map_err(|_| AppError::Internal(anyhow::anyhow!("Invalid contract address")))?;
+
+        let contract = Contract::new(addr, abi, client);
+
+        let mut call = contract
+            .method::<_, ()>("makePayment", U256::from(amount_usdc))
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Method error: {}", e)))?;
+        call.tx.set_gas(U256::from(300_000u64));
+        call.tx.set_gas_price(U256::from(35_000_000_000u64));
+
+        let pending = call
+            .send()
+            .await
+            .map_err(|e| AppError::BlockchainTxFailed(e.to_string()))?;
+
+        let receipt_result = timeout(Duration::from_secs(30), pending).await;
+
+        let receipt = match receipt_result {
+            Ok(Ok(Some(r))) => r,
+            Ok(Ok(None)) => return Err(AppError::BlockchainTxFailed("No receipt returned".into())),
+            Ok(Err(e)) => return Err(AppError::BlockchainTxFailed(e.to_string())),
+            Err(_) => return Err(AppError::BlockchainTimeout),
+        };
+
         tracing::info!(
             contract = %contract_address,
-            payment = payment_number,
-            "record_payment stub called"
+            tx = ?receipt.transaction_hash,
+            amount_usdc = amount_usdc,
+            "makePayment confirmed"
         );
+
         Ok(TxReceipt {
-            tx_hash: "0x_stub_payment_tx".to_string(),
+            tx_hash: format!("{:?}", receipt.transaction_hash),
             contract_address: contract_address.to_string(),
-            block_number: Some(0),
-            gas_used: Some(0),
+            block_number: receipt.block_number.map(|b| b.as_u64()),
+            gas_used: receipt.gas_used.map(|g| g.as_u64()),
         })
     }
 

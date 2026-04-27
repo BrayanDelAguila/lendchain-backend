@@ -35,8 +35,8 @@ impl BlockchainAdapter for StubBlockchainAdapter {
     async fn fund_loan(
         &self,
         contract_address: &str,
-        _lender_address: &str,
-        _amount_usdc: f64,
+        _lender_wallet_encrypted: &str,
+        _encryption_key: &str,
     ) -> Result<TxReceipt, lendchain_backend::errors::AppError> {
         Ok(TxReceipt {
             tx_hash: "0x_stub_fund_tx".to_string(),
@@ -49,8 +49,9 @@ impl BlockchainAdapter for StubBlockchainAdapter {
     async fn record_payment(
         &self,
         contract_address: &str,
-        _payment_number: u32,
-        _amount_usdc: f64,
+        _borrower_wallet_encrypted: &str,
+        _encryption_key: &str,
+        _amount_usdc: u64,
     ) -> Result<TxReceipt, lendchain_backend::errors::AppError> {
         Ok(TxReceipt {
             tx_hash: "0x_stub_payment_tx".to_string(),
