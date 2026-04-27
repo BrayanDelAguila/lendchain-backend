@@ -50,6 +50,22 @@ pub async fn list_by_loan(pool: &PgPool, loan_id: Uuid) -> Result<Vec<Payment>, 
     .await
 }
 
+/// Mark a payment as CONFIRMED and record the on-chain tx hash.
+pub async fn confirm_payment(
+    pool: &PgPool,
+    payment_id: Uuid,
+    tx_hash: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE loan_payments SET status = 'CONFIRMED', tx_hash = $1, paid_at = NOW() WHERE id = $2",
+    )
+    .bind(tx_hash)
+    .bind(payment_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Find a single payment by id.
 pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Payment>, sqlx::Error> {
     sqlx::query_as::<_, Payment>("SELECT * FROM loan_payments WHERE id = $1")

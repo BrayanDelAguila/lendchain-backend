@@ -69,13 +69,7 @@ pub async fn pay_installment(
         )
         .await?;
 
-    sqlx::query(
-        "UPDATE loan_payments SET status = 'CONFIRMED', tx_hash = $1, paid_at = NOW() WHERE id = $2",
-    )
-    .bind(&receipt.tx_hash)
-    .bind(next_payment.id)
-    .execute(pool)
-    .await?;
+    db_payments::confirm_payment(pool, next_payment.id, &receipt.tx_hash).await?;
 
     let confirmed_count = payments.iter().filter(|p| p.status == "CONFIRMED").count() + 1;
     if confirmed_count >= payments.len() {
