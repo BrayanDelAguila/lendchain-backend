@@ -211,14 +211,12 @@ pub async fn fund_loan(
         .as_deref()
         .ok_or_else(|| AppError::InvalidState("Loan has no deployed contract".into()))?;
 
-    use bigdecimal::ToPrimitive;
-    let amount_f64 = loan
-        .amount_usdc
-        .to_f64()
-        .ok_or_else(|| AppError::Internal(anyhow::anyhow!("BigDecimal conversion failed")))?;
-
     let receipt = blockchain
-        .fund_loan(contract_address, &lender.wallet_address, amount_f64)
+        .fund_loan(
+            contract_address,
+            &lender.encrypted_private_key,
+            &config.wallet_encryption_key,
+        )
         .await?;
 
     let now = chrono::Utc::now();
@@ -254,71 +252,18 @@ pub async fn pay_loan_installment(
     let user_id: Uuid = auth.0.sub.parse().map_err(|_| AppError::Unauthorized)?;
     let loan_id = path.into_inner();
 
-    let loan = crate::db::loans::find_by_id(&pool, loan_id)
-        .await?
-        .ok_or(AppError::NotFound)?;
-
-    if loan.borrower_id != user_id {
-        return Err(AppError::Forbidden);
-    }
-    if loan.status != "FUNDED" {
-        return Err(AppError::InvalidState(
-            "Loan must be in FUNDED status to accept payments".into(),
-        ));
-    }
-
-    let payments = crate::db::payments::list_by_loan(&pool, loan_id).await?;
-
-    let next_payment = payments
-        .iter()
-        .find(|p| p.status == "PENDING")
-        .ok_or_else(|| AppError::InvalidState("No pending payments found".into()))?;
-
-    let contract_address = loan
-        .contract_address
-        .as_deref()
-        .ok_or_else(|| AppError::InvalidState("Loan has no deployed contract".into()))?;
-
-    use bigdecimal::ToPrimitive;
-    let amount_f64 = next_payment
-        .amount_usdc
-        .to_f64()
-        .ok_or_else(|| AppError::Internal(anyhow::anyhow!("BigDecimal conversion failed")))?;
-
-    let receipt = blockchain
-        .record_payment(
-            contract_address,
-            next_payment.payment_number as u32,
-            amount_f64,
-        )
-        .await?;
-
-    // Mark payment as CONFIRMED
-    sqlx::query(
-        r#"
-        UPDATE loan_payments
-        SET status = 'CONFIRMED', tx_hash = $1, paid_at = NOW()
-        WHERE id = $2
-        "#,
+    let result = crate::services::payment_service::pay_installment(
+        &pool,
+        &blockchain,
+        &config,
+        loan_id,
+        user_id,
     )
-    .bind(&receipt.tx_hash)
-    .bind(next_payment.id)
-    .execute(pool.as_ref())
     .await?;
-
-    // If all payments confirmed, mark loan as REPAID
-    let confirmed_count = payments.iter().filter(|p| p.status == "CONFIRMED").count() + 1;
-    if confirmed_count >= payments.len() {
-        crate::db::loans::update_status(&pool, loan_id, "REPAID").await?;
-    }
-
-    let tx_url = loan_service::polygonscan_url(config.polygon_chain_id, &receipt.tx_hash);
 
     Ok(HttpResponse::Created().json(serde_json::json!({
         "success": true,
-        "payment_number": next_payment.payment_number,
-        "tx_hash": receipt.tx_hash,
-        "tx_url": tx_url
+        "data": result
     })))
 }
 

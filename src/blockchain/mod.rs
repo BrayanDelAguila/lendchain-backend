@@ -41,20 +41,24 @@ pub trait BlockchainAdapter: Send + Sync {
         term_months: u32,
     ) -> Result<TxReceipt, AppError>;
 
-    /// Transfer USDC from lender to the loan contract.
+    /// Transfer USDC from lender to the loan contract (calls fundLoan()).
+    /// `lender_wallet_encrypted` is the AES-256-GCM encrypted private key.
     async fn fund_loan(
         &self,
         contract_address: &str,
-        lender_address: &str,
-        amount_usdc: f64,
+        lender_wallet_encrypted: &str,
+        encryption_key: &str,
     ) -> Result<TxReceipt, AppError>;
 
-    /// Record a borrower repayment on the loan contract.
+    /// Record a borrower repayment on the loan contract (calls makePayment()).
+    /// `borrower_wallet_encrypted` is the AES-256-GCM encrypted private key.
+    /// `amount_usdc` is in USDC units with 6 decimal places (e.g. 100 USDC = 100_000_000).
     async fn record_payment(
         &self,
         contract_address: &str,
-        payment_number: u32,
-        amount_usdc: f64,
+        borrower_wallet_encrypted: &str,
+        encryption_key: &str,
+        amount_usdc: u64,
     ) -> Result<TxReceipt, AppError>;
 
     /// Fetch the current on-chain state of a loan contract.
